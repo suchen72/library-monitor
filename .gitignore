@@ -1,0 +1,7 @@
+node_modules/
+.env
+.DS_Store
+sessions/
+logs/
+data/library-data.json
+data/notified.json

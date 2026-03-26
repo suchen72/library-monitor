@@ -1,0 +1,17 @@
+{
+  "name": "library-dashboard",
+  "version": "1.0.0",
+  "description": "台北市立圖書館借閱儀表板",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^8.0.4",
+    "playwright": "^1.40.0"
+  }
+}
