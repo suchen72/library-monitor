@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>台北市立圖書館 借閱儀表板</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>📚 台北市立圖書館 借閱儀表板</h1>
+    <div class="header-right">
+      <span id="lastUpdated">尚未更新</span>
+      <button id="refreshBtn" onclick="triggerRefresh()">立即更新</button>
+    </div>
+  </header>
+
+  <div id="statusBanner"></div>
+
+  <main>
+    <div id="emptyState" style="display:none">
+      <h2>尚無資料</h2>
+      <p>請點擊「立即更新」取得借閱資訊</p>
+    </div>
+    <div id="content"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
