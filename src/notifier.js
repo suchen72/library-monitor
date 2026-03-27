@@ -42,11 +42,19 @@ async function checkAndNotify(data) {
   for (const account of (data.accounts || [])) {
     if (account.status !== 'ok') continue;
 
-    // 1) Books due within 2 days
+    // 1) Overdue books  2) Books due within 2 days
     for (const book of (account.borrowed || [])) {
       if (!book.dueDate) continue;
       const due = new Date(book.dueDate);
-      if (due <= twoDaysLater) {
+      const daysUntilDue = Math.floor((due - today) / 86400000);
+
+      if (daysUntilDue < 0) {
+        alerts.push({
+          type: 'overdue',
+          key: `overdue:${account.id}:${book.title}:${book.dueDate}`,
+          text: `🔴 【已逾期】${account.label} - 「${book.title}」到期日：${book.dueDate}（逾期 ${Math.abs(daysUntilDue)} 天）`,
+        });
+      } else if (daysUntilDue <= 2) {
         alerts.push({
           type: 'due-soon',
           key: `due:${account.id}:${book.title}:${book.dueDate}`,
@@ -94,6 +102,7 @@ async function checkAndNotify(data) {
   }
 
   // Build email
+  const overdueAlerts = newAlerts.filter(a => a.type === 'overdue');
   const dueAlerts = newAlerts.filter(a => a.type === 'due-soon');
   const readyAlerts = newAlerts.filter(a => a.type === 'pickup-ready');
   const expiringAlerts = newAlerts.filter(a => a.type === 'pickup-expiring');
@@ -101,6 +110,10 @@ async function checkAndNotify(data) {
   let body = '台北市立圖書館借閱提醒\n';
   body += '═══════════════════════\n\n';
 
+  if (overdueAlerts.length > 0) {
+    body += `【已逾期的書籍】（${overdueAlerts.length} 本）\n`;
+    body += overdueAlerts.map(a => '  • ' + a.text).join('\n') + '\n\n';
+  }
   if (dueAlerts.length > 0) {
     body += `【即將到期的書籍】（${dueAlerts.length} 本）\n`;
     body += dueAlerts.map(a => '  • ' + a.text).join('\n') + '\n\n';

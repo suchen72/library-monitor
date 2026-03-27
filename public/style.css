@@ -157,9 +157,47 @@ tr:last-child td { border-bottom: none; }
 tr:hover td { background: #f7fafc; }
 
 /* Due date coloring */
+.due-overdue { color: #9b2c2c; font-weight: 700; }
 .due-red { color: #e53e3e; font-weight: 700; }
 .due-yellow { color: #d69e2e; font-weight: 600; }
 .due-green { color: #38a169; }
+
+/* Overdue row highlight */
+.row-overdue td { background: #fff5f5; }
+.row-overdue:hover td { background: #fed7d7; }
+
+/* Due date badges */
+.badge-overdue {
+  display: inline-block;
+  background: #9b2c2c;
+  color: white;
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+.badge-today {
+  display: inline-block;
+  background: #e53e3e;
+  color: white;
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+.badge-urgent {
+  display: inline-block;
+  background: #fc8181;
+  color: white;
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+.overdue-count { color: #e53e3e; font-weight: 700; }
 
 /* Reservation ready section */
 .reserve-section .section-title { color: #2b6cb0; }
