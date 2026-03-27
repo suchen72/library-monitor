@@ -191,10 +191,11 @@ async function _checkLogin(page) {
   try {
     const bodyText = await page.locator('body').textContent();
     if (!bodyText) return false;
-    // Check positive indicators FIRST (login modal HTML is always in the DOM, even when logged in)
+    // If page says "需要登入", session is expired
+    if (bodyText.includes('該功能需要登入才能使用')) return false;
+    // Positive indicators — must be on actual member content page
     if (/總共\d+筆/.test(bodyText)) return true;
     if (bodyText.includes('HI !') || bodyText.includes('HI!')) return true;
-    if (bodyText.includes('歡迎來到您的個人書房')) return true;
     return false;
   } catch {
     return false;

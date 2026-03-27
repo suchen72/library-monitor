@@ -77,21 +77,26 @@ function renderBorrowedTable(books) {
     ? `<tr class="empty-row"><td colspan="5">目前無借閱書籍</td></tr>`
     : sorted.map(b => {
         const dueClass = getDueClass(b.dueDate);
+        const dueLabel = getDueLabel(b.dueDate);
         const canRenew = b.canRenew
           ? '<span class="badge-yes">可續借</span>'
           : '<span class="badge-no">-</span>';
-        return `<tr>
+        const rowClass = dueClass === 'due-overdue' ? ' class="row-overdue"' : '';
+        return `<tr${rowClass}>
           <td><span class="acct-tag">${escHtml(b.accountLabel)}</span></td>
           <td>${escHtml(b.title)}</td>
-          <td class="${dueClass}">${b.dueDate || '-'}</td>
+          <td class="${dueClass}">${b.dueDate || '-'} ${dueLabel}</td>
           <td>${b.renewalCount ?? '-'} 次</td>
           <td>${canRenew}</td>
         </tr>`;
       }).join('');
 
+  const overdueCount = sorted.filter(b => getDueClass(b.dueDate) === 'due-overdue').length;
+  const overdueNote = overdueCount > 0 ? `，<span class="overdue-count">${overdueCount} 本逾期</span>` : '';
+
   return `
     <div class="section">
-      <div class="section-title">借閱中（共 ${books.length} 本，依到期日排序）</div>
+      <div class="section-title">借閱中（共 ${books.length} 本${overdueNote}，依到期日排序）</div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>帳號</th><th>書名</th><th>到期日</th><th>已續借</th><th>狀態</th></tr></thead>
@@ -214,12 +219,29 @@ function hideBanner() {
 }
 
 // --- Helpers ---
+function getDaysLeft(dateStr) {
+  if (!dateStr) return null;
+  const due = new Date(dateStr);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.floor((due - today) / 86400000);
+}
+
 function getDueClass(dateStr) {
-  if (!dateStr) return '';
-  const days = Math.ceil((new Date(dateStr) - new Date().setHours(0,0,0,0)) / 86400000);
+  const days = getDaysLeft(dateStr);
+  if (days === null) return '';
+  if (days < 0) return 'due-overdue';
   if (days <= 2) return 'due-red';
   if (days <= 7) return 'due-yellow';
   return 'due-green';
+}
+
+function getDueLabel(dateStr) {
+  const days = getDaysLeft(dateStr);
+  if (days === null) return '';
+  if (days < 0) return `<span class="badge-overdue">逾期 ${Math.abs(days)} 天</span>`;
+  if (days === 0) return `<span class="badge-today">今天到期</span>`;
+  if (days <= 2) return `<span class="badge-urgent">剩 ${days} 天</span>`;
+  return '';
 }
 
 function formatDateTime(iso) {
