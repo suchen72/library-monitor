@@ -23,6 +23,9 @@ const SEL = {
 // How long to wait for user to solve CAPTCHA (5 minutes)
 const CAPTCHA_TIMEOUT_MS = 5 * 60 * 1000;
 
+// Use consistent user-agent across headless and visible modes
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
 let _emitEvent = () => {};
 
 function setEmitter(fn) {
@@ -67,18 +70,19 @@ async function scrapeAccount(account) {
   const sessionPath = getSessionPath(account.id);
   const hasSession = fs.existsSync(sessionPath);
 
-  // Try headless first if we have a session
+  // Try session reuse if we have a saved session (works within same day)
   if (hasSession) {
     try {
       const result = await _scrapeWithSession(account, sessionPath);
+      console.log(`[${account.id}] Session reuse succeeded`);
       return result;
     } catch (err) {
-      console.log(`[${account.id}] Session reuse failed (${err.message}), will re-login`);
-      fs.unlinkSync(sessionPath);
+      console.log(`[${account.id}] Session expired, will prompt for CAPTCHA`);
+      if (fs.existsSync(sessionPath)) fs.unlinkSync(sessionPath);
     }
   }
 
-  // No session or expired → interactive login
+  // No session or expired → interactive login with CAPTCHA
   return await _scrapeWithLogin(account, sessionPath);
 }
 
@@ -88,6 +92,7 @@ async function _scrapeWithSession(account, sessionPath) {
     const context = await browser.newContext({
       storageState: sessionPath,
       locale: 'zh-TW',
+      userAgent: USER_AGENT,
     });
     const page = await context.newPage();
 
@@ -129,7 +134,7 @@ async function _scrapeWithLogin(account, sessionPath) {
   // Open visible browser so user can solve CAPTCHA
   const browser = await chromium.launch({ headless: false, slowMo: 100 });
   try {
-    const context = await browser.newContext({ locale: 'zh-TW' });
+    const context = await browser.newContext({ locale: 'zh-TW', userAgent: USER_AGENT });
     const page = await context.newPage();
 
     await _login(page, account);
@@ -140,7 +145,7 @@ async function _scrapeWithLogin(account, sessionPath) {
     await page.goto(BASE_URL + SEL.reservePage, { waitUntil: 'networkidle', timeout: 20000 });
     const reservations = await _scrapeReservations(page);
 
-    // Save session for future headless use
+    // Save session for potential same-session reuse
     await context.storageState({ path: sessionPath });
     await browser.close();
 
@@ -189,14 +194,17 @@ async function _login(page, account) {
 
 async function _checkLogin(page) {
   try {
-    const bodyText = await page.locator('body').textContent();
-    if (!bodyText) return false;
-    // If page says "需要登入", session is expired
-    if (bodyText.includes('該功能需要登入才能使用')) return false;
-    // Positive indicators — must be on actual member content page
-    if (/總共\d+筆/.test(bodyText)) return true;
-    if (bodyText.includes('HI !') || bodyText.includes('HI!')) return true;
-    return false;
+    // Many text indicators (登出, 歡迎來到您的個人書房, 該功能需要登入) are ALWAYS in the DOM
+    // regardless of login state. Use VISIBILITY checks instead of text content.
+    // When NOT logged in: CAPTCHA input and login button are visible
+    // When logged in: CAPTCHA input is hidden, booklist items or data tables are visible
+    const captchaVisible = await page.locator('input[name="captcha"]').isVisible().catch(() => false);
+    if (captchaVisible) return false;  // login modal is showing → not logged in
+
+    const loginBtnVisible = await page.locator('input#loginBtn').isVisible().catch(() => false);
+    if (loginBtnVisible) return false;  // login button is showing → not logged in
+
+    return true;  // no login prompt visible → session is valid
   } catch {
     return false;
   }
