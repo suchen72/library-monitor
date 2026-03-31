@@ -1,9 +1,5 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
-const fs = require('fs');
-const path = require('path');
-
-const SENT_LOG_PATH = path.join(__dirname, '..', 'data', 'notified.json');
 
 function readEmailConfig() {
   if (process.env.EMAIL_ENABLED !== 'true') return null;
@@ -14,19 +10,6 @@ function readEmailConfig() {
   return { enabled: true, senderEmail: sender, senderAppPassword: pass, recipientEmail: recipient };
 }
 
-// Track which notifications we've already sent today (avoid duplicates)
-function readSentLog() {
-  if (!fs.existsSync(SENT_LOG_PATH)) return {};
-  try { return JSON.parse(fs.readFileSync(SENT_LOG_PATH, 'utf8')); } catch { return {}; }
-}
-
-function writeSentLog(log) {
-  fs.writeFileSync(SENT_LOG_PATH, JSON.stringify(log, null, 2), 'utf8');
-}
-
-function todayKey() {
-  return new Date().toISOString().slice(0, 10); // "2026-03-26"
-}
 
 async function checkAndNotify(data) {
   const config = readEmailConfig();
@@ -90,22 +73,11 @@ async function checkAndNotify(data) {
 
   if (alerts.length === 0) return;
 
-  // Deduplicate: only send alerts not yet sent today
-  const sentLog = readSentLog();
-  const todayStr = todayKey();
-  const todaySent = sentLog[todayStr] || [];
-  const newAlerts = alerts.filter(a => !todaySent.includes(a.key));
-
-  if (newAlerts.length === 0) {
-    console.log('[notifier] All alerts already sent today, skipping');
-    return;
-  }
-
-  // Build email
-  const overdueAlerts = newAlerts.filter(a => a.type === 'overdue');
-  const dueAlerts = newAlerts.filter(a => a.type === 'due-soon');
-  const readyAlerts = newAlerts.filter(a => a.type === 'pickup-ready');
-  const expiringAlerts = newAlerts.filter(a => a.type === 'pickup-expiring');
+  // Build email with all current alerts
+  const overdueAlerts = alerts.filter(a => a.type === 'overdue');
+  const dueAlerts = alerts.filter(a => a.type === 'due-soon');
+  const readyAlerts = alerts.filter(a => a.type === 'pickup-ready');
+  const expiringAlerts = alerts.filter(a => a.type === 'pickup-expiring');
 
   let body = '台北市立圖書館借閱提醒\n';
   body += '═══════════════════════\n\n';
@@ -129,20 +101,11 @@ async function checkAndNotify(data) {
 
   body += '---\n此信由圖書館借閱儀表板自動發送';
 
-  const subject = `圖書館提醒：${newAlerts.length} 項待處理事項`;
+  const subject = `圖書館提醒：${alerts.length} 項待處理事項`;
 
   try {
     await sendEmail(config, subject, body);
-    // Record sent alerts
-    sentLog[todayStr] = [...todaySent, ...newAlerts.map(a => a.key)];
-    // Clean up old entries (keep 7 days)
-    for (const key of Object.keys(sentLog)) {
-      if (key < new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)) {
-        delete sentLog[key];
-      }
-    }
-    writeSentLog(sentLog);
-    console.log(`[notifier] Email sent with ${newAlerts.length} alerts`);
+    console.log(`[notifier] Email sent with ${alerts.length} alerts`);
   } catch (err) {
     console.error('[notifier] Failed to send email:', err.message);
   }
