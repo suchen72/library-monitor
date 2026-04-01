@@ -1,9 +1,15 @@
 // Cloudflare Worker: LINE Webhook → GitHub Actions trigger
-// Receives LINE messages, triggers GitHub Actions workflow on keyword match
+// Different keywords trigger different notification modes
 
-const TRIGGER_KEYWORDS = ['更新', '刷新', 'update', 'refresh'];
 const GITHUB_REPO = 'suchen72/library-monitor';
 const WORKFLOW_FILE = 'scrape.yml';
+
+// Keyword → mode mapping (extensible for future modes)
+const KEYWORD_MODES = [
+  { keywords: ['更新', '總覽', 'summary'], mode: 'summary' },
+  { keywords: ['檢查', '通知', 'daily'], mode: 'daily' },
+];
+const DEFAULT_MODE = 'summary';
 
 export default {
   async fetch(request, env) {
@@ -12,7 +18,6 @@ export default {
     }
 
     try {
-      // Verify LINE webhook signature
       const body = await request.text();
       const signature = request.headers.get('x-line-signature');
       if (!await verifySignature(env.LINE_CHANNEL_SECRET, body, signature)) {
@@ -23,10 +28,22 @@ export default {
       for (const event of (data.events || [])) {
         if (event.type === 'message' && event.message?.type === 'text') {
           const text = event.message.text.trim().toLowerCase();
-          const isTriggered = TRIGGER_KEYWORDS.some(kw => text.includes(kw));
 
-          if (isTriggered) {
-            // Trigger GitHub Actions
+          // Determine mode from keyword
+          let mode = null;
+          for (const { keywords, mode: m } of KEYWORD_MODES) {
+            if (keywords.some(kw => text.includes(kw))) {
+              mode = m;
+              break;
+            }
+          }
+
+          if (mode === null && text.length <= 10) {
+            // Short unrecognized message — treat as default
+            mode = DEFAULT_MODE;
+          }
+
+          if (mode) {
             const ghRes = await fetch(
               `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
               {
@@ -36,13 +53,16 @@ export default {
                   'Accept': 'application/vnd.github.v3+json',
                   'User-Agent': 'library-monitor-line-bot',
                 },
-                body: JSON.stringify({ ref: 'main' }),
+                body: JSON.stringify({
+                  ref: 'main',
+                  inputs: { mode },
+                }),
               }
             );
 
-            // Reply to user
+            const modeLabel = { summary: '借閱總覽', daily: '每日檢查' }[mode] || mode;
             const replyText = ghRes.ok
-              ? '已觸發更新，完成後會通知你 📚'
+              ? `已觸發「${modeLabel}」，約 3 分鐘後回報結果 📚`
               : `觸發失敗（${ghRes.status}），請稍後再試`;
 
             await replyMessage(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken, replyText);

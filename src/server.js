@@ -4,7 +4,7 @@ const path = require('path');
 const EventEmitter = require('events');
 const { scrapeAll } = require('./scraper');
 const { readData } = require('./dataStore');
-const { checkAndNotify } = require('./notifier');
+const { notifyDaily } = require('./notifier');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -74,7 +74,7 @@ async function triggerRefresh() {
 
     // Check for alerts and send email notifications
     const latestData = readData();
-    await checkAndNotify(latestData);
+    await notifyDaily(latestData);
   } catch (err) {
     console.error('Refresh failed:', err.message);
     events.emit('scrape', { type: 'error-fatal', message: err.message });
