@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const { readAccounts, writeData, readData, getSessionPath } = require('./dataStore');
+const captchaSolver = require('./captchaSolver');
 
 const BASE_URL = 'https://book.tpml.edu.tw';
 
@@ -131,8 +132,8 @@ async function _scrapeWithSession(account, sessionPath) {
 async function _scrapeWithLogin(account, sessionPath) {
   _emitEvent({ type: 'logging-in', accountId: account.id, label: account.label });
 
-  // Open visible browser so user can solve CAPTCHA
-  const browser = await chromium.launch({ headless: false, slowMo: 100 });
+  // Auto-solve CAPTCHA with OCR — launch headless
+  const browser = await chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({ locale: 'zh-TW', userAgent: USER_AGENT });
     const page = await context.newPage();
@@ -175,21 +176,50 @@ async function _login(page, account) {
   await page.fill(SEL.username, account.cardNumber);
   await page.fill(SEL.password, account.password);
 
-  // Always treat as CAPTCHA-required — the site always shows CAPTCHA.
-  // Credentials are pre-filled; user only needs to enter CAPTCHA and click login.
-  _emitEvent({ type: 'captcha-required', accountId: account.id, label: account.label });
-  console.log(`[${account.id}] 請在已開啟的瀏覽器視窗輸入驗證碼，然後點擊登入`);
-
-  // Wait until URL contains loginstate (post-login redirect) or /personal
-  await page.waitForURL(url => {
-    const href = typeof url === 'string' ? url : url.href;
-    return href.includes('loginstate') || href.includes('/personal');
-  }, { timeout: CAPTCHA_TIMEOUT_MS });
-
-  // Let the post-login page fully settle
-  await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+  // Wait for login modal to fully render (CAPTCHA image needs time to load)
   await page.waitForTimeout(2000);
-  // Login complete — verification happens in the caller via _checkLogin on the member page
+
+  // Auto-solve CAPTCHA with OCR
+  if (captchaSolver.isAvailable()) {
+    _emitEvent({ type: 'captcha-solving', accountId: account.id, label: account.label });
+
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const captchaText = await captchaSolver.solveCaptcha(page);
+        await page.fill(SEL.captchaInput, captchaText);
+        await page.click(SEL.submitBtn);
+
+        // Wait for redirect (login success)
+        const success = await page.waitForURL(url => {
+          const href = typeof url === 'string' ? url : url.href;
+          return href.includes('loginstate') || href.includes('/personal');
+        }, { timeout: 10000 }).then(() => true).catch(() => false);
+
+        if (success) {
+          console.log(`[${account.id}] CAPTCHA auto-solved on attempt ${attempt}`);
+          _emitEvent({ type: 'captcha-solved', accountId: account.id, label: account.label });
+          await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+          await page.waitForTimeout(2000);
+          return;
+        }
+
+        // Login failed (wrong CAPTCHA), the page stays on login form
+        console.log(`[${account.id}] CAPTCHA attempt ${attempt} wrong, retrying...`);
+        // Re-fill credentials (page may have cleared them)
+        await page.waitForSelector(SEL.username, { timeout: 5000 }).catch(() => {});
+        await page.fill(SEL.username, account.cardNumber).catch(() => {});
+        await page.fill(SEL.password, account.password).catch(() => {});
+        await page.waitForTimeout(1000);
+      } catch (err) {
+        console.error(`[${account.id}] Auto-solve attempt ${attempt} error: ${err.message}`);
+      }
+    }
+
+    console.log(`[${account.id}] Auto-solve failed after all attempts`);
+  }
+
+  // All auto-solve attempts failed
+  throw new Error('CAPTCHA auto-solve failed — could not log in automatically');
 }
 
 async function _checkLogin(page) {
