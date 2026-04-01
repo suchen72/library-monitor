@@ -4,3 +4,6 @@ node_modules/
 sessions/
 logs/
 eng.traineddata
+data/library-data.json
+data/notified.json
+docs/data.json
