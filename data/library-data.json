@@ -1,0 +1,663 @@
+{
+  "lastUpdated": "2026-04-01T05:13:03.617Z",
+  "accounts": [
+    {
+      "id": "account1",
+      "label": "sclin",
+      "status": "ok",
+      "error": null,
+      "lastScraped": "2026-04-01T05:12:24.492Z",
+      "borrowed": [
+        {
+          "title": "My very first mother goose",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "葫蘆堵"
+        },
+        {
+          "title": "放屁者聯盟 : 動物世界的射擊高手",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "龍山"
+        },
+        {
+          "title": "尋找海洋怪聲 : 用聲音幫助補食的動物",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "東湖"
+        },
+        {
+          "title": "小變色龍在那裡? : 123躲貓貓",
+          "dueDate": "2026-04-08",
+          "renewalCount": 3,
+          "canRenew": false,
+          "branch": "舊莊"
+        },
+        {
+          "title": "驚魂奧運會 : 物競天擇與適應",
+          "dueDate": "2026-04-08",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "三興"
+        },
+        {
+          "title": "冰原迷你象 : 巨型動物與復活生物學",
+          "dueDate": "2026-04-08",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "鬼屋美人魚 : 人類構造的演化與返祖現象",
+          "dueDate": "2026-04-08",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "石牌"
+        },
+        {
+          "title": "荒漠救命蛙 : 沙漠生態系與動物的適應",
+          "dueDate": "2026-04-08",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "中山"
+        },
+        {
+          "title": "Down by the station",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "吉利"
+        },
+        {
+          "title": "海洋酷斯拉 : 特殊海洋生態環境與物種適應",
+          "dueDate": "2026-04-08",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "安康"
+        },
+        {
+          "title": "莽原生死鬥 : 草原生態系與地下環境的生存適應",
+          "dueDate": "2026-04-08",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "城中"
+        },
+        {
+          "title": "Down by the station",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": false,
+          "branch": "吉利"
+        },
+        {
+          "title": "新編 用有聲書輕鬆聽出英語力 : 廖彩杏書單168本英語啟蒙經典",
+          "dueDate": "2026-04-10",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "萬興"
+        },
+        {
+          "title": "怪傑佐羅力之魔法師的弟子",
+          "dueDate": "2026-04-12",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "文山"
+        },
+        {
+          "title": "從頭動到腳",
+          "dueDate": "2026-04-18",
+          "renewalCount": 2,
+          "canRenew": true,
+          "branch": "總館"
+        },
+        {
+          "title": "怪傑佐羅力之邪惡幽靈船",
+          "dueDate": "2026-04-22",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "西中"
+        },
+        {
+          "title": "請問一下,踩得到底嗎?",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "廣慈"
+        },
+        {
+          "title": "我長大了 : 帶你的小鱷魚刷牙",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "延吉"
+        },
+        {
+          "title": "誰是仿冒大王?",
+          "dueDate": "2026-04-29",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "景新"
+        },
+        {
+          "title": "達克比與世界未解之謎. 1, 水怪貓騎士 : 尼斯湖水怪的疑案調查",
+          "dueDate": "2026-04-30",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "六合"
+        }
+      ],
+      "reservations": [
+        {
+          "title": "Henny Penny",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 已調出(調出日期:2026-03-29)「調撥中」預約無法取消，調撥超過一個禮拜請聯絡取書館（總館及分館閱覽室一覽表）",
+          "isReady": false,
+          "isInTransit": true,
+          "queuePosition": null,
+          "pickupDeadline": "2026-03-29"
+        },
+        {
+          "title": "孤島時光機 : 島嶼生態學與臺灣島的形成",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-02-21 讀者預約，順位第21位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 21,
+          "pickupDeadline": "2026-02-21"
+        },
+        {
+          "title": "Hop on Pop",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-23 讀者預約，順位第3位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 3,
+          "pickupDeadline": "2026-03-23"
+        },
+        {
+          "title": "怪傑佐羅力之恐怖足球隊",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-25 讀者預約，順位第12位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 12,
+          "pickupDeadline": "2026-03-25"
+        },
+        {
+          "title": "怪傑佐羅力之佐羅力被捕了!!",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-25 讀者預約，順位第24位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 24,
+          "pickupDeadline": "2026-03-25"
+        },
+        {
+          "title": "怪傑佐羅力和神祕的飛機",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-25 讀者預約，順位第11位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 11,
+          "pickupDeadline": "2026-03-25"
+        }
+      ]
+    },
+    {
+      "id": "account2",
+      "label": "Tomky",
+      "status": "ok",
+      "error": null,
+      "lastScraped": "2026-04-01T05:12:44.543Z",
+      "borrowed": [
+        {
+          "title": "哎喲!誰來幫幫我?",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "北投"
+        },
+        {
+          "title": "我也會",
+          "dueDate": "2026-04-08",
+          "renewalCount": 2,
+          "canRenew": true,
+          "branch": "石牌"
+        },
+        {
+          "title": "壞蛋的祕密 : 另類的動物育兒行為",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "永春"
+        },
+        {
+          "title": "國家地理恐龍爭霸戰 : 地球上最古老、最凶猛、最怪異的史前動物排行榜!",
+          "dueDate": "2026-04-08",
+          "renewalCount": 3,
+          "canRenew": false,
+          "branch": "舊莊"
+        },
+        {
+          "title": "甲龍寶寶",
+          "dueDate": "2026-04-08",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "龍山"
+        },
+        {
+          "title": "The wheels on the bus : go round and round",
+          "dueDate": "2026-04-12",
+          "renewalCount": 0,
+          "canRenew": false,
+          "branch": "大同"
+        },
+        {
+          "title": "The wheels on the bus : go round and round",
+          "dueDate": "2026-04-12",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "內湖"
+        },
+        {
+          "title": "Five little men in a flying saucer",
+          "dueDate": "2026-04-17",
+          "renewalCount": 0,
+          "canRenew": false,
+          "branch": "民生"
+        },
+        {
+          "title": "Five little men in a flying saucer",
+          "dueDate": "2026-04-17",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "民生"
+        },
+        {
+          "title": "Emergency",
+          "dueDate": "2026-04-18",
+          "renewalCount": 3,
+          "canRenew": false,
+          "branch": "龍安"
+        },
+        {
+          "title": "My first book of animals",
+          "dueDate": "2026-04-18",
+          "renewalCount": 3,
+          "canRenew": false,
+          "branch": "力行"
+        },
+        {
+          "title": "小企鵝釣大魚!",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "西園"
+        },
+        {
+          "title": "怪傑佐羅力之媽媽我愛你",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "東湖"
+        },
+        {
+          "title": "0~4歲的兒語潛能開發寶典 : 全球暢銷10年!英國皇家語言治療師專業研發",
+          "dueDate": "2026-04-25",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "北投"
+        },
+        {
+          "title": "Playtown : a lift-the-flap book",
+          "dueDate": "2026-04-25",
+          "renewalCount": 3,
+          "canRenew": false,
+          "branch": "力行"
+        },
+        {
+          "title": "鵝媽媽經典童謠 = My very first mother goose",
+          "dueDate": "2026-04-26",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "力行"
+        },
+        {
+          "title": "怪傑佐羅力之拯救小恐龍",
+          "dueDate": "2026-04-26",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "龍安"
+        },
+        {
+          "title": "怪傑佐羅力之大怪獸入侵",
+          "dueDate": "2026-04-26",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "龍安"
+        },
+        {
+          "title": "鵝媽媽經典童謠 = My very first mother goose",
+          "dueDate": "2026-04-26",
+          "renewalCount": 0,
+          "canRenew": false,
+          "branch": "力行"
+        },
+        {
+          "title": "屁屁丹迪 = Oshiri Dandy The young",
+          "dueDate": "2026-04-29",
+          "renewalCount": 1,
+          "canRenew": true,
+          "branch": "成功"
+        },
+        {
+          "title": "海底失蹤案 : 海洋生物博物館與珊瑚礁大搜索",
+          "dueDate": "2026-04-30",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "北投"
+        }
+      ],
+      "reservations": [
+        {
+          "title": "運動場的小妖怪. 1",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 已調出(調出日期:2026-03-31)「調撥中」預約無法取消，調撥超過一個禮拜請聯絡取書館（總館及分館閱覽室一覽表）",
+          "isReady": false,
+          "isInTransit": true,
+          "queuePosition": null,
+          "pickupDeadline": "2026-03-31"
+        },
+        {
+          "title": "森林裡的小妖怪",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 已調出(調出日期:2026-04-01)「調撥中」預約無法取消，調撥超過一個禮拜請聯絡取書館（總館及分館閱覽室一覽表）",
+          "isReady": false,
+          "isInTransit": true,
+          "queuePosition": null,
+          "pickupDeadline": "2026-04-01"
+        },
+        {
+          "title": "海洋裡的小妖怪",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 已調出(調出日期:2026-04-01)「調撥中」預約無法取消，調撥超過一個禮拜請聯絡取書館（總館及分館閱覽室一覽表）",
+          "isReady": false,
+          "isInTransit": true,
+          "queuePosition": null,
+          "pickupDeadline": "2026-04-01"
+        },
+        {
+          "title": "Green eggs and ham",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-09 讀者預約，順位第1位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 1,
+          "pickupDeadline": "2026-03-09"
+        },
+        {
+          "title": "怪傑佐羅力之恐怖的禮物",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-25 讀者預約，順位第6位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 6,
+          "pickupDeadline": "2026-03-25"
+        },
+        {
+          "title": "怪傑佐羅力之恐怖遊樂園",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-25 讀者預約，順位第5位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 5,
+          "pickupDeadline": "2026-03-25"
+        }
+      ]
+    },
+    {
+      "id": "account3",
+      "label": "family",
+      "status": "ok",
+      "error": null,
+      "lastScraped": "2026-04-01T05:13:03.617Z",
+      "borrowed": [
+        {
+          "title": "飛行消防員,勇哥",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "來玩形狀遊戲!",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "新朋友!",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "神奇的交通工具",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "超級大塞車",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "老虎卡車",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "一起玩!",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "小黑貓 小白貓",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "如果我有一隻恐龍",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "春季冒險",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "我愛的玩具",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "是誰藏在沙漠和海裡? : 動物世界的捉迷藏高手",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "我贊成!",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "小噗,生日快樂",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "先有蛋",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "嚇我一大跳!",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "哇!小恐龍愛刷牙了",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "偷偷看一下 : 忙碌的農場",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "舊莊"
+        },
+        {
+          "title": "飛行消防員,勇哥",
+          "dueDate": "2026-04-18",
+          "renewalCount": 0,
+          "canRenew": false,
+          "branch": "舊莊"
+        },
+        {
+          "title": "皮皮與波西 : 小蝸牛",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "內湖"
+        },
+        {
+          "title": "皮皮與波西 : 晚安小青蛙",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "城中"
+        },
+        {
+          "title": "皮皮與波西 : 恐怖大怪獸",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "蘭州"
+        },
+        {
+          "title": "皮皮與波西 : 小水窪",
+          "dueDate": "2026-04-23",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "道藩"
+        },
+        {
+          "title": "皮皮與波西 : 紅氣球",
+          "dueDate": "2026-04-26",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "中山"
+        },
+        {
+          "title": "皮皮與波西 : 生日派對",
+          "dueDate": "2026-04-26",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "城中"
+        },
+        {
+          "title": "好奇孩子大探索 : 真的假的?原來地球這麼逗",
+          "dueDate": "2026-04-30",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "安康"
+        },
+        {
+          "title": "好奇孩子大探索 : 危機就是轉機,古生物生存圖鑑",
+          "dueDate": "2026-04-30",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "葫蘆堵"
+        },
+        {
+          "title": "好奇孩子大探索 : 變態.變身.變異!我們是機智的海洋生物 : 海洋生物的驚人生態圖鑑",
+          "dueDate": "2026-04-30",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "清江"
+        },
+        {
+          "title": "好奇孩子大探索 : 真的假的?原來宇宙這麼炫",
+          "dueDate": "2026-04-30",
+          "renewalCount": 0,
+          "canRenew": true,
+          "branch": "六合"
+        }
+      ],
+      "reservations": [
+        {
+          "title": "好奇孩子大探索 : 真的假的?原來人類這麼囧",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 已調出(調出日期:2026-03-27)「調撥中」預約無法取消，調撥超過一個禮拜請聯絡取書館（總館及分館閱覽室一覽表）",
+          "isReady": false,
+          "isInTransit": true,
+          "queuePosition": null,
+          "pickupDeadline": "2026-03-27"
+        },
+        {
+          "title": "吹牛男爵達萬的大冒險",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-31 讀者預約，順位第137位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 137,
+          "pickupDeadline": "2026-03-31"
+        },
+        {
+          "title": "勇敢的勇太",
+          "pickupBranch": "I22親子美育數位館(服務時間至17時)",
+          "status": "流通狀態 : 2026-03-31 讀者預約，順位第137位",
+          "isReady": false,
+          "isInTransit": false,
+          "queuePosition": 137,
+          "pickupDeadline": "2026-03-31"
+        }
+      ]
+    }
+  ]
+}

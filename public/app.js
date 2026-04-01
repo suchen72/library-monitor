@@ -1,14 +1,11 @@
-let sseSource = null;
-
 window.addEventListener('DOMContentLoaded', () => {
   loadData();
-  setInterval(loadData, 60000);
 });
 
 // --- Load and render ---
 async function loadData() {
   try {
-    const res = await fetch('/api/data');
+    const res = await fetch('./data.json');
     if (!res.ok) throw new Error('Failed to fetch data');
     renderDashboard(await res.json());
   } catch (err) {
@@ -29,7 +26,6 @@ function renderDashboard(data) {
   }
   document.getElementById('emptyState').style.display = 'none';
 
-  // Flatten all borrowed books and reservations with account label attached
   const allBorrowed = accounts.flatMap(a =>
     (a.borrowed || []).map(b => ({ ...b, accountId: a.id, accountLabel: a.label || a.id, accountStatus: a.status }))
   );
@@ -50,11 +46,11 @@ function renderDashboard(data) {
 // --- Account summary bar ---
 function renderAccountSummary(accounts) {
   const badges = accounts.map(a => {
-    const cls = { ok: 'status-ok', error: 'status-error', refreshing: 'status-refreshing' }[a.status] || 'status-ok';
-    const label = { ok: '正常', error: '錯誤', refreshing: '更新中' }[a.status] || a.status;
+    const cls = { ok: 'status-ok', error: 'status-error' }[a.status] || 'status-ok';
+    const label = { ok: '正常', error: '錯誤' }[a.status] || a.status;
     return `<span class="account-badge">
       ${escHtml(a.label || a.id)}
-      <span class="status-badge ${cls}" id="badge-${escHtml(a.id)}">${label}</span>
+      <span class="status-badge ${cls}">${label}</span>
     </span>`;
   }).join('');
   return `<div class="account-summary">${badges}</div>`;
@@ -144,78 +140,12 @@ function renderReservationsTable(readyItems, otherItems) {
     </div>`;
 }
 
-// --- Refresh ---
-async function triggerRefresh() {
-  const btn = document.getElementById('refreshBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>更新中...';
-  showBanner('info', '正在更新借閱資訊，請稍候...');
-
-  try {
-    await fetch('/api/refresh', { method: 'POST' });
-  } catch (err) {
-    showBanner('error', '無法觸發更新：' + err.message);
-    resetRefreshBtn();
-    return;
-  }
-
-  if (sseSource) sseSource.close();
-  sseSource = new EventSource('/api/refresh-status');
-  sseSource.onmessage = (e) => handleSseEvent(JSON.parse(e.data));
-  sseSource.onerror = () => { sseSource.close(); resetRefreshBtn(); loadData(); };
-}
-
-function handleSseEvent(event) {
-  switch (event.type) {
-    case 'started':
-      showBanner('info', `正在更新「${event.label}」...`);
-      setBadgeStatus(event.accountId, 'refreshing');
-      break;
-    case 'logging-in':
-      showBanner('info', `正在登入「${event.label}」...`);
-      break;
-    case 'captcha-required':
-      showBanner('warning', `⚠️ 「${event.label}」需要輸入驗證碼 — 請查看已開啟的瀏覽器視窗，輸入驗證碼後點擊登入`);
-      break;
-    case 'done':
-      setBadgeStatus(event.accountId, 'ok');
-      break;
-    case 'error':
-      setBadgeStatus(event.accountId, 'error');
-      showBanner('error', `「${event.label}」更新失敗：${event.message}`);
-      break;
-    case 'complete':
-    case 'error-fatal':
-      if (sseSource) sseSource.close();
-      resetRefreshBtn();
-      hideBanner();
-      loadData();
-      break;
-  }
-}
-
-function setBadgeStatus(accountId, status) {
-  const badge = document.getElementById('badge-' + accountId);
-  if (!badge) return;
-  badge.className = 'status-badge status-' + status;
-  badge.textContent = { ok: '正常', error: '錯誤', refreshing: '更新中' }[status] || status;
-}
-
-function resetRefreshBtn() {
-  const btn = document.getElementById('refreshBtn');
-  btn.disabled = false;
-  btn.textContent = '立即更新';
-}
-
 // --- Banner ---
 function showBanner(type, message) {
   const b = document.getElementById('statusBanner');
   b.className = type;
   b.textContent = message;
   b.style.display = 'block';
-}
-function hideBanner() {
-  document.getElementById('statusBanner').style.display = 'none';
 }
 
 // --- Helpers ---
