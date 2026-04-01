@@ -5,3 +5,4 @@ sessions/
 logs/
 data/library-data.json
 data/notified.json
+eng.traineddata
