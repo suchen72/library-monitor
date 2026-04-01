@@ -6,8 +6,11 @@ const WORKFLOW_FILE = 'scrape.yml';
 
 // Keyword → mode mapping (extensible for future modes)
 const KEYWORD_MODES = [
-  { keywords: ['更新', '總覽', 'summary'], mode: 'summary' },
-  { keywords: ['檢查', '通知', 'daily'], mode: 'daily' },
+  { keywords: ['總覽', '更新', 'summary'], mode: 'summary' },
+  { keywords: ['通知', '檢查', 'daily'], mode: 'daily' },
+  { keywords: ['借閱', 'borrowed'], mode: 'borrowed' },
+  { keywords: ['預約', 'reservations'], mode: 'reservations' },
+  { keywords: ['還書', 'return'], mode: 'return' },
 ];
 const DEFAULT_MODE = 'summary';
 
@@ -60,7 +63,7 @@ export default {
               }
             );
 
-            const modeLabel = { summary: '借閱總覽', daily: '每日檢查' }[mode] || mode;
+            const modeLabel = { summary: '借閱總覽', daily: '每日檢查', borrowed: '近期到期', reservations: '預約狀態', return: '還書建議' }[mode] || mode;
             const replyText = ghRes.ok
               ? `已觸發「${modeLabel}」，約 3 分鐘後回報結果 📚`
               : `觸發失敗（${ghRes.status}），請稍後再試`;
