@@ -14,7 +14,7 @@ events.setMaxListeners(50);
 let isRefreshing = false;
 
 // --- Static files ---
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'docs')));
 
 // --- API: Get cached data ---
 app.get('/api/data', (req, res) => {
