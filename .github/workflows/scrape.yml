@@ -1,0 +1,71 @@
+name: Library Scrape & Notify
+
+on:
+  schedule:
+    # 22:00 Taiwan time (UTC+8) = 14:00 UTC
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: scrape
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run scraper and notifier
+        env:
+          ACCOUNT1_LABEL: ${{ secrets.ACCOUNT1_LABEL }}
+          ACCOUNT1_CARD: ${{ secrets.ACCOUNT1_CARD }}
+          ACCOUNT1_PASSWORD: ${{ secrets.ACCOUNT1_PASSWORD }}
+          ACCOUNT2_LABEL: ${{ secrets.ACCOUNT2_LABEL }}
+          ACCOUNT2_CARD: ${{ secrets.ACCOUNT2_CARD }}
+          ACCOUNT2_PASSWORD: ${{ secrets.ACCOUNT2_PASSWORD }}
+          ACCOUNT3_LABEL: ${{ secrets.ACCOUNT3_LABEL }}
+          ACCOUNT3_CARD: ${{ secrets.ACCOUNT3_CARD }}
+          ACCOUNT3_PASSWORD: ${{ secrets.ACCOUNT3_PASSWORD }}
+          EMAIL_ENABLED: ${{ secrets.EMAIL_ENABLED }}
+          EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
+          EMAIL_RECIPIENT: ${{ secrets.EMAIL_RECIPIENT }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          LINE_TARGET_ID: ${{ secrets.LINE_TARGET_ID }}
+        run: node src/run.js
+
+      - name: Copy data for GitHub Pages
+        run: cp data/library-data.json public/data.json
+
+      - name: Commit updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/library-data.json public/data.json
+          git diff --staged --quiet || git commit -m "chore: update library data [skip ci]"
+          git push

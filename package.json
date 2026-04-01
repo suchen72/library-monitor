@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "run": "node src/run.js",
     "dev": "node --watch src/server.js"
   },
   "dependencies": {
