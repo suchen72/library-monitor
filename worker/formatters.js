@@ -8,6 +8,8 @@ const BORROW_LIMITS = {
 };
 const DEFAULT_LIMIT = 25;
 
+// --- Helpers ---
+
 function getToday() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -19,13 +21,35 @@ function daysUntil(dateStr) {
   return Math.floor((new Date(dateStr) - getToday()) / 86400000);
 }
 
-function formatTime(iso) {
-  if (!iso) return '未知';
-  return new Date(iso).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' });
+function shortDate(dateStr) {
+  if (!dateStr) return '?';
+  const d = new Date(dateStr);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+function shortTime(iso) {
+  if (!iso) return '未知';
+  const d = new Date(iso);
+  const tw = new Date(d.getTime() + 8 * 3600000);
+  const M = tw.getUTCMonth() + 1;
+  const D = tw.getUTCDate();
+  const h = tw.getUTCHours();
+  const m = String(tw.getUTCMinutes()).padStart(2, '0');
+  return `${M}/${D} ${h}:${m}`;
+}
+
+function shortBranch(name) {
+  if (!name) return '';
+  return name
+    .replace(/^[A-Z]\d{1,2}/, '')
+    .replace(/\(服務時間至\d+時\)/, '')
+    .trim();
+}
+
+// --- Build functions ---
+
 export function buildSummary(data) {
-  let msg = '📚 借閱總覽\n═══════════════════════\n\n';
+  let msg = '📚 借閱總覽\n───────\n\n';
 
   for (const account of (data.accounts || [])) {
     if (account.status !== 'ok') {
@@ -40,19 +64,18 @@ export function buildSummary(data) {
     const nearest = sorted[0];
 
     msg += `【${account.label}】\n`;
-    msg += `  📖 借閱 ${borrowed.length} 本`;
+    msg += `📖 借閱 ${borrowed.length} 本\n`;
     if (nearest) {
       const days = daysUntil(nearest.dueDate);
       const label = days < 0 ? `逾期 ${Math.abs(days)} 天` : days === 0 ? '今天到期' : `剩 ${days} 天`;
-      msg += `，最近到期：${nearest.dueDate}（${label}）`;
+      msg += `📅 最近到期 ${shortDate(nearest.dueDate)}（${label}）\n`;
     }
-    msg += '\n';
-    msg += `  📋 預約 ${reservations.length} 本`;
-    if (ready.length > 0) msg += `，${ready.length} 本可領取`;
+    msg += `📋 預約 ${reservations.length} 本`;
+    if (ready.length > 0) msg += `，${ready.length} 本可取`;
     msg += '\n\n';
   }
 
-  msg += `更新時間：${formatTime(data.lastUpdated)}`;
+  msg += `🕐 ${shortTime(data.lastUpdated)} 更新`;
   return msg;
 }
 
@@ -72,20 +95,20 @@ export function buildBorrowedSoon(data) {
   books.sort((a, b) => a.days - b.days);
 
   if (books.length === 0) {
-    return `📖 近 5 天到期的書\n═══════════════════════\n\n✅ 沒有近期到期的書籍。\n\n更新時間：${formatTime(data.lastUpdated)}`;
+    return `📖 近 5 天到期\n───────\n\n✅ 沒有近期到期的書籍\n\n🕐 ${shortTime(data.lastUpdated)} 更新`;
   }
 
-  let msg = `📖 近 5 天到期的書（${books.length} 本）\n═══════════════════════\n\n`;
+  let msg = `📖 近 5 天到期（${books.length} 本）\n───────\n\n`;
 
   for (const b of books) {
     const label = b.days < 0 ? `⚠️ 逾期 ${Math.abs(b.days)} 天` : b.days === 0 ? '⚠️ 今天到期' : `剩 ${b.days} 天`;
     const renew = b.canRenew ? '可續借' : '不可續借';
-    msg += `${label}｜${b.dueDate}\n`;
-    msg += `  ${b.title}\n`;
-    msg += `  ${b.accountLabel}｜已續借 ${b.renewalCount ?? 0} 次｜${renew}\n\n`;
+    msg += `${label}｜${shortDate(b.dueDate)}\n`;
+    msg += `${b.title}\n`;
+    msg += `${b.accountLabel}｜續借 ${b.renewalCount ?? 0} 次｜${renew}\n\n`;
   }
 
-  msg += `更新時間：${formatTime(data.lastUpdated)}`;
+  msg += `🕐 ${shortTime(data.lastUpdated)} 更新`;
   return msg;
 }
 
@@ -107,38 +130,39 @@ export function buildReservations(data) {
   ready.sort((a, b) => (a.pickupDeadline || '').localeCompare(b.pickupDeadline || ''));
 
   if (ready.length === 0 && inTransit.length === 0) {
-    return `📋 預約書狀態\n═══════════════════════\n\n✅ 目前沒有可領取或調閱中的預約書。\n\n更新時間：${formatTime(data.lastUpdated)}`;
+    return `📋 預約書狀態\n───────\n\n✅ 沒有可領取或調閱中的書\n\n🕐 ${shortTime(data.lastUpdated)} 更新`;
   }
 
-  let msg = '📋 預約書狀態\n═══════════════════════\n\n';
+  let msg = '📋 預約書狀態\n───────\n\n';
 
   if (ready.length > 0) {
-    msg += `【可領取】（${ready.length} 本）\n`;
+    msg += `📗 可領取（${ready.length} 本）\n\n`;
     for (const r of ready) {
-      const deadline = r.pickupDeadline ? `截止 ${r.pickupDeadline}` : '';
-      const branch = r.pickupBranch || '';
-      msg += `  📗 ${r.title}\n`;
-      msg += `     ${branch}${deadline ? '｜' + deadline : ''}\n\n`;
+      const deadline = r.pickupDeadline ? `截止 ${shortDate(r.pickupDeadline)}` : '';
+      const branch = shortBranch(r.pickupBranch);
+      msg += `${r.title}\n`;
+      msg += `${[branch, deadline].filter(Boolean).join('｜')}\n\n`;
     }
   }
 
   if (inTransit.length > 0) {
-    msg += `【調閱中】（${inTransit.length} 本）\n`;
+    msg += `📦 調閱中（${inTransit.length} 本）\n\n`;
     for (const r of inTransit) {
-      const branch = r.pickupBranch || '';
-      msg += `  📦 ${r.title}\n`;
-      if (branch) msg += `     ${branch}\n`;
+      const branch = shortBranch(r.pickupBranch);
+      msg += `${r.title}\n`;
+      if (branch) msg += `${branch}\n`;
       msg += '\n';
     }
   }
 
-  msg += `更新時間：${formatTime(data.lastUpdated)}`;
+  msg += `🕐 ${shortTime(data.lastUpdated)} 更新`;
   return msg;
 }
 
 export function buildReturnAdvice(data) {
-  let msg = '📕 還書建議\n═══════════════════════\n\n';
+  let msg = '📕 還書建議\n───────\n\n';
   let hasWarning = false;
+  const returnBooks = [];
 
   for (const account of (data.accounts || [])) {
     if (account.status !== 'ok') continue;
@@ -148,55 +172,58 @@ export function buildReturnAdvice(data) {
     const borrowed = account.borrowed || [];
     const reservations = account.reservations || [];
 
-    const dueTodayBooks = borrowed.filter(b => {
+    const A = borrowed.filter(b => {
       const days = daysUntil(b.dueDate);
       return days !== null && days <= 0;
-    });
-    const A = dueTodayBooks.length;
+    }).length;
 
-    const readyRes = reservations.filter(r => r.isReady);
-    const B = readyRes.length;
+    const B = reservations.filter(r => r.isReady).length;
 
     const currentCount = borrowed.length;
     const projectedCount = currentCount - A + B;
     const overLimit = projectedCount > limit;
 
-    msg += `【${label}】`;
-    msg += ` 現有 ${currentCount} 本｜上限 ${limit} 本\n`;
-    msg += `  今日到期 ${A} 本，待領取 ${B} 本\n`;
-    msg += `  還書後預計：${currentCount} - ${A} + ${B} = ${projectedCount} 本`;
+    msg += `【${label}】${currentCount}/${limit} 本`;
+    msg += overLimit ? ' ⚠️\n' : ' ✅\n';
+    msg += `到期 ${A} 本｜待取 ${B} 本\n`;
+    msg += `預計 ${projectedCount} 本`;
 
     if (overLimit) {
       hasWarning = true;
       const excess = projectedCount - limit;
-      msg += ` ⚠️ 超過上限 ${excess} 本！\n\n`;
+      msg += `｜超 ${excess} 本\n\n`;
 
       const nonRenewable = borrowed
         .filter(b => !b.canRenew && b.dueDate)
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-      const toReturn = nonRenewable.slice(0, excess);
+      for (const b of nonRenewable.slice(0, excess)) {
+        const days = daysUntil(b.dueDate);
+        const dueLabel = days < 0 ? `逾期 ${Math.abs(days)} 天` : days === 0 ? '今天到期' : `${shortDate(b.dueDate)} 到期`;
+        returnBooks.push({ title: b.title, dueLabel, accountLabel: label });
+      }
 
-      if (toReturn.length > 0) {
-        msg += `  📌 建議優先歸還（不可續借，共 ${toReturn.length} 本）：\n`;
-        for (const b of toReturn) {
-          const days = daysUntil(b.dueDate);
-          const dueLabel = days < 0 ? `逾期 ${Math.abs(days)} 天` : days === 0 ? '今天到期' : `${b.dueDate}`;
-          msg += `    • ${b.title}（${dueLabel}）\n`;
-        }
-      } else {
-        msg += `  ⚠️ 沒有不可續借的書，請自行選擇 ${excess} 本歸還\n`;
+      if (nonRenewable.length < excess) {
+        msg += `⚠️ 請自行選擇 ${excess - nonRenewable.length} 本歸還\n`;
       }
     } else {
-      msg += ' ✅\n';
+      msg += '\n';
+    }
+    msg += '\n';
+  }
+
+  if (returnBooks.length > 0) {
+    msg += `📌 建議歸還（${returnBooks.length} 本）\n`;
+    for (const b of returnBooks) {
+      msg += `• ${b.title}（${b.dueLabel}）\n`;
     }
     msg += '\n';
   }
 
   if (!hasWarning) {
-    msg += '✅ 所有帳號都在借書上限內，不需要額外還書。';
+    msg += '✅ 都在上限內，不需額外還書\n\n';
   }
 
-  msg += `\n\n更新時間：${formatTime(data.lastUpdated)}`;
+  msg += `🕐 ${shortTime(data.lastUpdated)} 更新`;
   return msg;
 }
