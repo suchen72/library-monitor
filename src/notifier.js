@@ -3,12 +3,10 @@ const nodemailer = require('nodemailer');
 const { readLineConfig, sendLineMessage } = require('./lineNotifier');
 
 // --- Account borrow limits ---
-const BORROW_LIMITS = {
-  sclin: 25,
-  tomky: 25,
-  family: 30,
-};
-const DEFAULT_LIMIT = 25;
+function getBorrowLimit(cardNumber) {
+  if (cardNumber && cardNumber.toUpperCase().startsWith('FA')) return 30;
+  return 25;
+}
 
 // --- Email config ---
 
@@ -279,7 +277,7 @@ function buildReturnAdvice(data) {
     if (account.status !== 'ok') continue;
 
     const label = account.label;
-    const limit = BORROW_LIMITS[label.toLowerCase()] || DEFAULT_LIMIT;
+    const limit = getBorrowLimit(account.cardNumber);
     const borrowed = account.borrowed || [];
     const reservations = account.reservations || [];
 

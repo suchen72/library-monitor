@@ -117,6 +117,7 @@ async function _scrapeWithSession(account, sessionPath) {
     return {
       id: account.id,
       label: account.label,
+      cardNumber: account.cardNumber,
       status: 'ok',
       error: null,
       lastScraped: new Date().toISOString(),
@@ -153,6 +154,7 @@ async function _scrapeWithLogin(account, sessionPath) {
     return {
       id: account.id,
       label: account.label,
+      cardNumber: account.cardNumber,
       status: 'ok',
       error: null,
       lastScraped: new Date().toISOString(),

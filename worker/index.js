@@ -44,6 +44,13 @@ export default {
       for (const event of (parsed.events || [])) {
         if (event.type !== 'message' || event.message?.type !== 'text') continue;
 
+        // userId whitelist (skip if ALLOWED_USER_IDS not set)
+        const userId = event.source?.userId;
+        const allowedIds = (env.ALLOWED_USER_IDS || '').split(',').filter(Boolean);
+        if (allowedIds.length > 0 && !allowedIds.includes(userId)) {
+          continue;
+        }
+
         const text = event.message.text.trim().toLowerCase();
 
         // Determine mode from keyword
