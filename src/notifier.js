@@ -341,60 +341,37 @@ function buildReturnAdvice(data) {
 
 // --- Dispatch functions ---
 
+async function notify(message, subject, label) {
+  await sendLine(message, label);
+  await trySendEmail(subject, message, label);
+}
+
 async function notifyDaily(data) {
   const alerts = buildAlerts(data);
-  const lineConfig = readLineConfig();
-  const emailConfig = readEmailConfig();
 
   if (alerts.length > 0) {
     const message = formatAlertMessage(alerts);
-    const subject = `圖書館提醒：${alerts.length} 項待處理事項`;
-
-    if (emailConfig?.enabled) {
-      try {
-        await sendEmail(emailConfig, subject, message);
-        console.log(`[notifier] Email sent with ${alerts.length} alerts`);
-      } catch (err) {
-        console.error('[notifier] Failed to send email:', err.message);
-      }
-    }
-
-    if (lineConfig) {
-      try {
-        await sendLineMessage(lineConfig.token, lineConfig.targetId, message);
-        console.log(`[notifier] LINE sent with ${alerts.length} alerts`);
-      } catch (err) {
-        console.error('[notifier] Failed to send LINE:', err.message);
-      }
-    }
+    await notify(message, `圖書館提醒：${alerts.length} 項待處理事項`, 'daily');
   } else {
-    const noAlertMsg = '📚 每日檢查完成\n\n✅ 今天沒有需要通知的事項';
-
-    if (lineConfig) {
-      try {
-        await sendLineMessage(lineConfig.token, lineConfig.targetId, noAlertMsg);
-        console.log('[notifier] LINE sent: no alerts today');
-      } catch (err) {
-        console.error('[notifier] Failed to send LINE:', err.message);
-      }
-    }
+    const message = '📚 每日檢查完成\n\n✅ 今天沒有需要通知的事項';
+    await notify(message, '圖書館每日檢查：無待處理事項', 'daily');
   }
 }
 
 async function notifySummary(data) {
-  await sendLine(buildSummary(data), 'summary');
+  await notify(buildSummary(data), '圖書館借閱總覽', 'summary');
 }
 
 async function notifyBorrowed(data) {
-  await sendLine(buildBorrowedSoon(data), 'borrowed');
+  await notify(buildBorrowedSoon(data), '圖書館：近期到期書籍', 'borrowed');
 }
 
 async function notifyReservations(data) {
-  await sendLine(buildReservations(data), 'reservations');
+  await notify(buildReservations(data), '圖書館：預約書狀態', 'reservations');
 }
 
 async function notifyReturn(data) {
-  await sendLine(buildReturnAdvice(data), 'return');
+  await notify(buildReturnAdvice(data), '圖書館：還書建議', 'return');
 }
 
 async function sendLine(message, label) {
@@ -405,6 +382,17 @@ async function sendLine(message, label) {
     console.log(`[notifier] LINE ${label} sent`);
   } catch (err) {
     console.error(`[notifier] Failed to send LINE ${label}:`, err.message);
+  }
+}
+
+async function trySendEmail(subject, body, label) {
+  const config = readEmailConfig();
+  if (!config?.enabled) return;
+  try {
+    await sendEmail(config, subject, body);
+    console.log(`[notifier] Email ${label} sent`);
+  } catch (err) {
+    console.error(`[notifier] Failed to send email ${label}:`, err.message);
   }
 }
 
