@@ -1,6 +1,7 @@
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 const { readLineConfig, sendLineMessage } = require('./lineNotifier');
+const { isClosed, getLastOpenDay, getTodayStatusLine, buildClosureCalendar } = require('./libraryHours');
 
 // --- Account borrow limits ---
 const DEFAULT_BORROW_LIMIT = 25;
@@ -127,6 +128,7 @@ function formatAlertMessage(alerts) {
   }
 
   let body = '📚 每日檢查報告\n───────\n\n';
+  body += getTodayStatusLine() + '\n\n';
   for (const g of Object.values(groups)) {
     if (g.items.length === 0) continue;
     body += `${g.emoji} ${g.label}（${g.items.length} 本）\n\n`;
@@ -150,6 +152,7 @@ function formatAlertMessage(alerts) {
 
 function buildSummary(data) {
   let msg = '📚 借閱總覽\n───────\n\n';
+  msg += getTodayStatusLine() + '\n\n';
 
   for (const account of (data.accounts || [])) {
     if (account.status !== 'ok') {
@@ -242,10 +245,15 @@ function buildReservations(data) {
   if (ready.length > 0) {
     msg += `📗 可領取（${ready.length} 本）\n\n`;
     for (const r of ready) {
-      const deadline = r.pickupDeadline ? `截止 ${shortDate(r.pickupDeadline)}` : '';
       const branch = shortBranch(r.pickupBranch);
+      let deadlineInfo = r.pickupDeadline ? `截止 ${shortDate(r.pickupDeadline)}` : '';
+      // 如果截止日休館，顯示最後取書日
+      if (r.pickupDeadline && isClosed(r.pickupDeadline)) {
+        const lastDay = getLastOpenDay(r.pickupDeadline);
+        deadlineInfo += `（⚠️ 休館，最後取書 ${shortDate(lastDay)}）`;
+      }
       msg += `${r.title}\n`;
-      msg += `${[branch, deadline].filter(Boolean).join('｜')}\n\n`;
+      msg += `${[branch, deadlineInfo].filter(Boolean).join('｜')}\n\n`;
     }
   }
 
@@ -334,6 +342,12 @@ function buildReturnAdvice(data) {
   return msg;
 }
 
+// --- Closure status (開館資訊) ---
+
+function buildClosureStatus() {
+  return buildClosureCalendar();
+}
+
 // --- Dispatch functions ---
 
 async function notify(message, subject, label) {
@@ -348,7 +362,7 @@ async function notifyDaily(data) {
     const message = formatAlertMessage(alerts);
     await notify(message, `圖書館提醒：${alerts.length} 項待處理事項`, 'daily');
   } else {
-    const message = '📚 每日檢查完成\n\n✅ 今天沒有需要通知的事項';
+    const message = `📚 每日檢查完成\n\n${getTodayStatusLine()}\n\n✅ 今天沒有需要通知的事項`;
     await notify(message, '圖書館每日檢查：無待處理事項', 'daily');
   }
 }
@@ -367,6 +381,10 @@ async function notifyReservations(data) {
 
 async function notifyReturn(data) {
   await notify(buildReturnAdvice(data), '圖書館：還書建議', 'return');
+}
+
+async function notifyClosureStatus() {
+  await notify(buildClosureStatus(), '圖書館：開館資訊', 'hours');
 }
 
 async function sendLine(message, label) {
@@ -413,4 +431,5 @@ module.exports = {
   notifyBorrowed,
   notifyReservations,
   notifyReturn,
+  notifyClosureStatus,
 };

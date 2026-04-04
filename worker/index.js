@@ -2,13 +2,14 @@
 // Query modes (總覽/借閱/預約/還書) read cached data from KV and reply instantly.
 // Scrape modes (更新/通知) trigger GitHub Actions to refresh data.
 
-import { buildSummary, buildBorrowedSoon, buildReservations, buildReturnAdvice } from './formatters.js';
+import { buildSummary, buildBorrowedSoon, buildReservations, buildReturnAdvice, buildClosureStatus } from './formatters.js';
 
 const WORKFLOW_FILE = 'scrape.yml';
 const MAX_TEXT_LENGTH = 5000;
 
 // Keyword → mode mapping (first match wins, order matters)
 const KEYWORD_MODES = [
+  { keywords: ['開館', '開門', 'hours', 'open'], mode: 'hours' },
   { keywords: ['更新', 'refresh'], mode: 'refresh' },
   { keywords: ['總覽', 'summary'], mode: 'summary' },
   { keywords: ['通知', '檢查', 'daily'], mode: 'daily' },
@@ -72,6 +73,13 @@ export default {
         }
 
         if (!mode) continue;
+
+        // 「開館」不需要 KV 資料，直接計算回覆
+        if (mode === 'hours') {
+          const message = buildClosureStatus();
+          await replyMessage(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken, message);
+          continue;
+        }
 
         // KV-based instant reply
         if (KV_BUILDERS[mode]) {

@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { scrapeAll } = require('./scraper');
 const { readData } = require('./dataStore');
-const { notifyDaily, notifySummary, notifyBorrowed, notifyReservations, notifyReturn } = require('./notifier');
+const { notifyDaily, notifySummary, notifyBorrowed, notifyReservations, notifyReturn, notifyClosureStatus } = require('./notifier');
 const captchaSolver = require('./captchaSolver');
 
 const mode = process.env.MODE || 'daily';
@@ -69,6 +69,9 @@ fs.mkdirSync(path.join(__dirname, '..', 'data'), { recursive: true });
         break;
       case 'return':
         await notifyReturn(data);
+        break;
+      case 'hours':
+        await notifyClosureStatus();
         break;
       case 'daily':
       default:

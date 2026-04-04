@@ -1,6 +1,8 @@
 // ES module port of pure formatting functions from src/notifier.js
 // Keep in sync with src/notifier.js when changing notification formats.
 
+import { isClosed, getLastOpenDay, getTodayStatusLine, buildClosureCalendar } from './libraryHours.js';
+
 const DEFAULT_BORROW_LIMIT = 25;
 
 // --- Helpers ---
@@ -45,6 +47,7 @@ function shortBranch(name) {
 
 export function buildSummary(data) {
   let msg = '📚 借閱總覽\n───────\n\n';
+  msg += getTodayStatusLine() + '\n\n';
 
   for (const account of (data.accounts || [])) {
     if (account.status !== 'ok') {
@@ -133,10 +136,14 @@ export function buildReservations(data) {
   if (ready.length > 0) {
     msg += `📗 可領取（${ready.length} 本）\n\n`;
     for (const r of ready) {
-      const deadline = r.pickupDeadline ? `截止 ${shortDate(r.pickupDeadline)}` : '';
       const branch = shortBranch(r.pickupBranch);
+      let deadlineInfo = r.pickupDeadline ? `截止 ${shortDate(r.pickupDeadline)}` : '';
+      if (r.pickupDeadline && isClosed(r.pickupDeadline)) {
+        const lastDay = getLastOpenDay(r.pickupDeadline);
+        deadlineInfo += `（⚠️ 休館，最後取書 ${shortDate(lastDay)}）`;
+      }
       msg += `${r.title}\n`;
-      msg += `${[branch, deadline].filter(Boolean).join('｜')}\n\n`;
+      msg += `${[branch, deadlineInfo].filter(Boolean).join('｜')}\n\n`;
     }
   }
 
@@ -152,6 +159,10 @@ export function buildReservations(data) {
 
   msg += `🕐 ${shortTime(data.lastUpdated)} 更新`;
   return msg;
+}
+
+export function buildClosureStatus() {
+  return buildClosureCalendar();
 }
 
 export function buildReturnAdvice(data) {
