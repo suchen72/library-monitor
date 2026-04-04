@@ -8,3 +8,5 @@ data/library-data.json
 data/notified.json
 docs/data.json
 worker/wrangler.toml
+launchd/
+.claude/
