@@ -7,6 +7,9 @@ account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
 binding = "LIBRARY_DATA"
 id = "YOUR_KV_NAMESPACE_ID"
 
+[vars]
+WHITELIST_ENABLED = "true"
+
 # Secrets (set via `wrangler secret put`):
 # - LINE_CHANNEL_SECRET
 # - LINE_CHANNEL_ACCESS_TOKEN
