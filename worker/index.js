@@ -146,6 +146,23 @@ async function verifySignature(channelSecret, body, signature) {
     ['sign']
   );
   const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-  const expected = btoa(String.fromCharCode(...new Uint8Array(sig)));
-  return expected === signature;
+
+  // 用 constant-time 比較，避免 timing attack：
+  // 普通的 === 遇到第一個不同字元就停止，攻擊者理論上可以透過
+  // 測量回應時間來逐字元猜測正確的 signature。
+  // 這裡改用 XOR 逐 byte 比較，不管哪裡不同都跑完全部，
+  // 所以回應時間不會洩漏「猜對了幾個字元」。
+  const expectedBytes = new Uint8Array(sig);
+  let sigBytes;
+  try {
+    sigBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
+  } catch {
+    return false; // base64 decode 失敗
+  }
+  if (expectedBytes.length !== sigBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expectedBytes.length; i++) {
+    diff |= expectedBytes[i] ^ sigBytes[i]; // XOR：相同為 0，不同為非 0
+  }
+  return diff === 0; // 全部 byte 都相同才是 0
 }
