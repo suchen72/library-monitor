@@ -14,4 +14,5 @@ WHITELIST_ENABLED = "true"
 # - LINE_CHANNEL_SECRET
 # - LINE_CHANNEL_ACCESS_TOKEN
 # - GITHUB_PAT
+# - GITHUB_REPO (e.g. "username/library-monitor", optional)
 # - ALLOWED_USER_IDS (comma-separated LINE userIds)

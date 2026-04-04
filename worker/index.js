@@ -4,7 +4,6 @@
 
 import { buildSummary, buildBorrowedSoon, buildReservations, buildReturnAdvice } from './formatters.js';
 
-const GITHUB_REPO = 'suchen72/library-monitor';
 const WORKFLOW_FILE = 'scrape.yml';
 const MAX_TEXT_LENGTH = 5000;
 
@@ -89,8 +88,9 @@ export default {
 
         // GitHub Actions trigger (daily / refresh)
         const ghMode = mode === 'refresh' ? 'summary' : 'daily';
+        const githubRepo = env.GITHUB_REPO || 'suchen72/library-monitor';
         const ghRes = await fetch(
-          `https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
+          `https://api.github.com/repos/${githubRepo}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
           {
             method: 'POST',
             headers: {
