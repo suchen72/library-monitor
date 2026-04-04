@@ -1,10 +1,7 @@
 // ES module port of pure formatting functions from src/notifier.js
 // Keep in sync with src/notifier.js when changing notification formats.
 
-function getBorrowLimit(cardNumber) {
-  if (cardNumber && cardNumber.toUpperCase().startsWith('FA')) return 30;
-  return 25;
-}
+const DEFAULT_BORROW_LIMIT = 25;
 
 // --- Helpers ---
 
@@ -166,7 +163,7 @@ export function buildReturnAdvice(data) {
     if (account.status !== 'ok') continue;
 
     const label = account.label;
-    const limit = getBorrowLimit(account.cardNumber);
+    const limit = account.borrowLimit || DEFAULT_BORROW_LIMIT;
     const borrowed = account.borrowed || [];
     const reservations = account.reservations || [];
 

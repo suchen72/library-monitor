@@ -5,6 +5,11 @@ const captchaSolver = require('./captchaSolver');
 
 const BASE_URL = 'https://book.tpml.edu.tw';
 
+function getBorrowLimit(cardNumber) {
+  if (cardNumber && cardNumber.toUpperCase().startsWith('FA')) return 30;
+  return 25;
+}
+
 // --- Selectors (discovered from live site) ---
 const SEL = {
   loginBtn: 'button.btn.btn-sm',           // "登入" button in header
@@ -117,7 +122,7 @@ async function _scrapeWithSession(account, sessionPath) {
     return {
       id: account.id,
       label: account.label,
-      cardNumber: account.cardNumber,
+      borrowLimit: getBorrowLimit(account.cardNumber),
       status: 'ok',
       error: null,
       lastScraped: new Date().toISOString(),
@@ -154,7 +159,7 @@ async function _scrapeWithLogin(account, sessionPath) {
     return {
       id: account.id,
       label: account.label,
-      cardNumber: account.cardNumber,
+      borrowLimit: getBorrowLimit(account.cardNumber),
       status: 'ok',
       error: null,
       lastScraped: new Date().toISOString(),
