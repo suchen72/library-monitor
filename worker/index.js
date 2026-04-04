@@ -51,6 +51,8 @@ export default {
         if (env.WHITELIST_ENABLED !== 'false') {
           const allowedIds = (env.ALLOWED_USER_IDS || '').split(',').filter(Boolean);
           if (!allowedIds.length || !allowedIds.includes(userId)) {
+            await replyMessage(env.LINE_CHANNEL_ACCESS_TOKEN, event.replyToken,
+              '未授權，請聯繫管理員');
             continue;
           }
         }
