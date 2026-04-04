@@ -82,8 +82,8 @@ async function triggerRefresh() {
   }
 }
 
-// --- Daily cron: 22:00 every day ---
-cron.schedule('0 22 * * *', () => {
+// --- Daily cron: 00:00 every day (Taipei time) ---
+cron.schedule('0 0 * * *', () => {
   console.log('[cron] Daily refresh triggered');
   triggerRefresh();
 });

@@ -2,8 +2,8 @@ name: Library Scrape & Notify
 
 on:
   schedule:
-    # 22:00 Taiwan time (UTC+8) = 14:00 UTC
-    - cron: '0 14 * * *'
+    # 00:00 Taiwan time (UTC+8) = 16:00 UTC
+    - cron: '0 16 * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -44,6 +44,7 @@ jobs:
 
       - name: Run scraper and notifier
         env:
+          TZ: Asia/Taipei
           MODE: ${{ github.event.inputs.mode || 'daily' }}
           ACCOUNT1_LABEL: ${{ secrets.ACCOUNT1_LABEL }}
           ACCOUNT1_CARD: ${{ secrets.ACCOUNT1_CARD }}
