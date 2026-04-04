@@ -7,3 +7,4 @@ eng.traineddata
 data/library-data.json
 data/notified.json
 docs/data.json
+worker/wrangler.toml
