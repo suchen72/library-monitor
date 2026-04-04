@@ -90,7 +90,7 @@ cron.schedule('0 22 * * *', () => {
 });
 
 // --- Start server ---
-app.listen(PORT, () => {
+app.listen(PORT, '127.0.0.1', () => {
   console.log(`圖書館儀表板已啟動: http://localhost:${PORT}`);
   console.log('每天 22:00 自動更新，或點擊儀表板上的「立即更新」手動觸發');
 });
