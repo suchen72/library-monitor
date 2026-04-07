@@ -6,7 +6,7 @@ logs/
 eng.traineddata
 data/library-data.json
 data/notified.json
-docs/data.json
+data/favorites.json
 worker/wrangler.toml
 launchd/
 .claude/

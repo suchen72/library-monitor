@@ -45,6 +45,30 @@ header h1 { font-size: 1.2rem; font-weight: 600; }
 #refreshBtn:hover { background: #ebf8ff; }
 #refreshBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
+/* Tab bar */
+#tabBar {
+  display: flex;
+  gap: 0;
+  background: #2c5282;
+  padding: 0 24px;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+.tab-btn:hover { color: white; }
+.tab-btn.active {
+  color: white;
+  border-bottom-color: white;
+}
+
 /* Status banner */
 #statusBanner {
   display: none;
@@ -259,6 +283,73 @@ tr:hover td { background: #f7fafc; }
 /* Renewal status */
 .badge-yes { color: #38a169; font-weight: 600; }
 .badge-no  { color: #a0aec0; }
+
+/* Favorite button (multi-tag colored hearts) */
+.fav-col { text-align: center; white-space: nowrap; }
+.fav-btn {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #e2e8f0;
+  transition: color 0.2s;
+  padding: 0 2px;
+}
+.fav-btn:hover { color: var(--heart-color, #fc8181); opacity: 0.7; }
+.fav-btn.fav-active { color: var(--heart-color, #e53e3e); }
+
+/* Tag badge (favorites page) */
+.tag-badge {
+  display: inline-block;
+  color: white;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* Favorite filters */
+.fav-filters {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f7fafc;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  background: white;
+  border: 1px solid #e2e8f0;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: #4a5568;
+  transition: all 0.2s;
+}
+.filter-btn:hover { border-color: #a0aec0; }
+.filter-btn.active {
+  background: var(--tag-color, #2b6cb0);
+  color: white;
+  border-color: var(--tag-color, #2b6cb0);
+}
+
+/* Favorite remove button */
+.fav-remove-btn {
+  background: none;
+  border: 1px solid #e2e8f0;
+  color: #a0aec0;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.fav-remove-btn:hover {
+  background: #fff5f5;
+  color: #e53e3e;
+  border-color: #fc8181;
+}
 
 /* Found checkbox */
 .check-col { text-align: center; }

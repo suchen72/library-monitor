@@ -4,6 +4,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const DATA_PATH = path.join(ROOT, 'data', 'library-data.json');
+const FAVORITES_PATH = path.join(ROOT, 'data', 'favorites.json');
 const SESSIONS_DIR = path.join(ROOT, 'sessions');
 
 function readAccounts() {
@@ -89,4 +90,65 @@ async function readFromKV() {
   return null;
 }
 
-module.exports = { readAccounts, readData, writeData, getSessionPath, pushToKV, readFromKV };
+// --- Favorites ---
+
+function readFavorites() {
+  if (!fs.existsSync(FAVORITES_PATH)) {
+    return { tags: ['包包', '可可貝貝', '大人'], favorites: [] };
+  }
+  const data = JSON.parse(fs.readFileSync(FAVORITES_PATH, 'utf8'));
+  if (!data.tags) data.tags = ['包包', '可可貝貝', '大人'];
+  return data;
+}
+
+function writeFavorites(data) {
+  const dir = path.dirname(FAVORITES_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = FAVORITES_PATH + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+  fs.renameSync(tmp, FAVORITES_PATH);
+}
+
+async function pushFavoritesToKV(data) {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const namespaceId = process.env.CF_KV_NAMESPACE_ID;
+  const apiToken = process.env.CF_API_TOKEN;
+
+  if (!accountId || !namespaceId || !apiToken) return;
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/favorites`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[KV] Favorites push failed (${res.status}): ${body}`);
+  }
+}
+
+async function readFavoritesFromKV() {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const namespaceId = process.env.CF_KV_NAMESPACE_ID;
+  const apiToken = process.env.CF_API_TOKEN;
+
+  if (!accountId || !namespaceId || !apiToken) return null;
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/favorites`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${apiToken}` },
+  });
+
+  if (res.ok) return await res.json();
+  return null;
+}
+
+module.exports = {
+  readAccounts, readData, writeData, getSessionPath, pushToKV, readFromKV,
+  readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
+};

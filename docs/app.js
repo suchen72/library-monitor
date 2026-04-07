@@ -1,17 +1,138 @@
+let currentFavorites = [];
+let currentTags = ['包包', '可可貝貝', '大人'];
+let favFilterTag = null; // null = show all
+
+const TAG_COLORS = {
+  '包包':    { color: '#e53e3e', label: '包' },
+  '可可貝貝': { color: '#d69e2e', label: '可' },
+  '大人':    { color: '#3182ce', label: '大' },
+};
+
 window.addEventListener('DOMContentLoaded', () => {
   loadData();
   document.getElementById('refreshBtn').addEventListener('click', triggerRefresh);
+
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.getElementById('content').style.display = tab === 'dashboard' ? '' : 'none';
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('favoritesContent').style.display = tab === 'favorites' ? '' : 'none';
+      if (tab === 'favorites') loadFavorites();
+    });
+  });
 });
 
 // --- Load and render ---
 async function loadData() {
   try {
-    const res = await fetch('/api/data');
-    if (!res.ok) throw new Error('Failed to fetch data');
-    renderDashboard(await res.json());
+    const [dataRes, favRes] = await Promise.all([
+      fetch('/api/data'),
+      fetch('/api/favorites'),
+    ]);
+    if (!dataRes.ok) throw new Error('Failed to fetch data');
+    if (favRes.ok) {
+      const favData = await favRes.json();
+      currentFavorites = favData.favorites || [];
+    }
+    renderDashboard(await dataRes.json());
   } catch (err) {
     showBanner('error', '無法取得資料：' + err.message);
   }
+}
+
+// --- Favorites ---
+async function loadFavorites() {
+  try {
+    const res = await fetch('/api/favorites');
+    if (!res.ok) throw new Error('Failed to fetch favorites');
+    const data = await res.json();
+    currentFavorites = data.favorites || [];
+    currentTags = data.tags || currentTags;
+    renderFavoritesPage();
+  } catch (err) {
+    showBanner('error', '無法取得最愛清單：' + err.message);
+  }
+}
+
+async function toggleFavorite(title, tag) {
+  const existing = currentFavorites.find(f => f.title === title);
+  const hasTag = existing && existing.tags.includes(tag);
+  const method = hasTag ? 'DELETE' : 'POST';
+
+  await fetch('/api/favorites', {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, tag }),
+  });
+
+  // Update local state
+  if (hasTag) {
+    existing.tags = existing.tags.filter(t => t !== tag);
+    if (existing.tags.length === 0) {
+      currentFavorites = currentFavorites.filter(f => f.title !== title);
+    }
+  } else if (existing) {
+    existing.tags.push(tag);
+  } else {
+    currentFavorites.push({ title, tags: [tag], dateAdded: new Date().toISOString() });
+  }
+
+  // Update heart button state in borrowed table
+  const btn = document.querySelector(`.fav-btn[data-title="${CSS.escape(title)}"][data-tag="${CSS.escape(tag)}"]`);
+  if (btn) btn.classList.toggle('fav-active', !hasTag);
+}
+
+function renderFavoritesPage() {
+  const filtered = favFilterTag
+    ? currentFavorites.filter(f => f.tags.includes(favFilterTag))
+    : currentFavorites;
+
+  // Filter buttons
+  let filterHtml = '<div class="fav-filters">';
+  filterHtml += `<button class="filter-btn ${!favFilterTag ? 'active' : ''}" onclick="setFavFilter(null)">全部</button>`;
+  for (const tag of currentTags) {
+    const tc = TAG_COLORS[tag] || { color: '#718096', label: tag[0] };
+    const active = favFilterTag === tag ? ' active' : '';
+    filterHtml += `<button class="filter-btn${active}" style="--tag-color:${tc.color}" onclick="setFavFilter('${escHtml(tag)}')">${escHtml(tag)}</button>`;
+  }
+  filterHtml += '</div>';
+
+  if (filtered.length === 0) {
+    document.getElementById('favoritesContent').innerHTML = filterHtml +
+      '<div class="section"><div class="section-title">我的最愛</div><div class="card-body" style="text-align:center;color:#a0aec0;padding:40px">還沒有最愛的書籍</div></div>';
+    return;
+  }
+
+  const rows = filtered.map(f => {
+    const tagBadges = (f.tags || []).map(t => {
+      const tc = TAG_COLORS[t] || { color: '#718096', label: t[0] };
+      return `<span class="tag-badge" style="background:${tc.color}">${escHtml(t)}</span>`;
+    }).join(' ');
+    return `<tr>
+      <td>${escHtml(f.title)}</td>
+      <td>${tagBadges}</td>
+      <td>${formatDateTime(f.dateAdded)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('favoritesContent').innerHTML = filterHtml + `<div class="section">
+    <div class="section-title">我的最愛（共 ${filtered.length} 本）</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>書名</th><th>誰的最愛</th><th>加入日期</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function setFavFilter(tag) {
+  favFilterTag = tag;
+  renderFavoritesPage();
 }
 
 // --- Trigger refresh ---
@@ -135,7 +256,7 @@ function renderBorrowedTable(books) {
   const sorted = [...books].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
 
   const rows = sorted.length === 0
-    ? `<tr class="empty-row"><td colspan="7">目前無借閱書籍</td></tr>`
+    ? `<tr class="empty-row"><td colspan="8">目前無借閱書籍</td></tr>`
     : sorted.map(b => {
         const dueClass = getDueClass(b.dueDate);
         const dueLabel = getDueLabel(b.dueDate);
@@ -146,6 +267,12 @@ function renderBorrowedTable(books) {
         const reserveCount = (b.reservationCount > 0)
           ? `<span class="badge-overdue">${b.reservationCount} 人</span>`
           : '0';
+        const favEntry = currentFavorites.find(f => f.title === b.title);
+        const hearts = currentTags.map(tag => {
+          const tc = TAG_COLORS[tag] || { color: '#718096', label: tag[0] };
+          const active = favEntry && favEntry.tags.includes(tag);
+          return `<button class="fav-btn ${active ? 'fav-active' : ''}" data-title="${escHtml(b.title)}" data-tag="${escHtml(tag)}" style="--heart-color:${tc.color}" onclick="toggleFavorite(this.dataset.title, this.dataset.tag)" title="${escHtml(tag)}">&#9829;</button>`;
+        }).join('');
         const rowClass = dueClass === 'due-overdue' ? ' class="row-overdue"' : '';
         return `<tr${rowClass}>
           <td><span class="acct-tag">${escHtml(b.accountLabel)}</span></td>
@@ -154,6 +281,7 @@ function renderBorrowedTable(books) {
           <td>${(b.renewalCount ?? 0) >= 3 ? `<span class="badge-overdue">${b.renewalCount} 次</span>` : `${b.renewalCount ?? '-'} 次`}</td>
           <td>${reserveCount}</td>
           <td>${canRenew}</td>
+          <td class="fav-col">${hearts}</td>
           <td class="check-col"><input type="checkbox" class="found-check"></td>
         </tr>`;
       }).join('');
@@ -166,7 +294,7 @@ function renderBorrowedTable(books) {
       <div class="section-title">借閱中（共 ${books.length} 本${overdueNote}，依到期日排序）</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>帳號</th><th>書名</th><th>到期日</th><th>已續借</th><th>預約</th><th>狀態</th><th>找到</th></tr></thead>
+          <thead><tr><th>帳號</th><th>書名</th><th>到期日</th><th>已續借</th><th>預約</th><th>狀態</th><th>最愛</th><th>找到</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>

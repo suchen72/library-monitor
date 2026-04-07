@@ -3,7 +3,7 @@ const cron = require('node-cron');
 const path = require('path');
 const EventEmitter = require('events');
 const { scrapeAll } = require('./scraper');
-const { readData, readFromKV, pushToKV } = require('./dataStore');
+const { readData, readFromKV, pushToKV, readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV } = require('./dataStore');
 const { notifyDaily } = require('./notifier');
 
 const app = express();
@@ -13,7 +13,8 @@ events.setMaxListeners(50);
 
 let isRefreshing = false;
 
-// --- Static files ---
+// --- Middleware ---
+app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'docs')));
 
 // --- API: Get data from KV (single source of truth) ---
@@ -61,6 +62,57 @@ app.get('/api/refresh-status', (req, res) => {
 
   events.on('scrape', listener);
   req.on('close', () => events.off('scrape', listener));
+});
+
+// --- API: Favorites ---
+app.get('/api/favorites', async (req, res) => {
+  try {
+    const data = await readFavoritesFromKV();
+    res.json(data || readFavorites());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/favorites', async (req, res) => {
+  try {
+    const { title, tag } = req.body;
+    if (!title || !tag) return res.status(400).json({ error: 'title and tag required' });
+
+    const data = readFavorites();
+    const existing = data.favorites.find(f => f.title === title);
+    if (existing) {
+      if (!existing.tags.includes(tag)) existing.tags.push(tag);
+    } else {
+      data.favorites.push({ title, tags: [tag], dateAdded: new Date().toISOString() });
+    }
+    writeFavorites(data);
+    await pushFavoritesToKV(data);
+    res.json({ status: 'added' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/favorites', async (req, res) => {
+  try {
+    const { title, tag } = req.body;
+    if (!title || !tag) return res.status(400).json({ error: 'title and tag required' });
+
+    const data = readFavorites();
+    const existing = data.favorites.find(f => f.title === title);
+    if (existing) {
+      existing.tags = existing.tags.filter(t => t !== tag);
+      if (existing.tags.length === 0) {
+        data.favorites = data.favorites.filter(f => f.title !== title);
+      }
+    }
+    writeFavorites(data);
+    await pushFavoritesToKV(data);
+    res.json({ status: 'removed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // --- Refresh logic ---

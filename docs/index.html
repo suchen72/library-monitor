@@ -15,6 +15,11 @@
     </div>
   </header>
 
+  <nav id="tabBar">
+    <button class="tab-btn active" data-tab="dashboard">借閱總覽</button>
+    <button class="tab-btn" data-tab="favorites">我的最愛</button>
+  </nav>
+
   <div id="statusBanner"></div>
 
   <main>
@@ -23,6 +28,7 @@
       <p>點擊右上角「立即更新」或透過 LINE 傳送「更新」觸發</p>
     </div>
     <div id="content"></div>
+    <div id="favoritesContent" style="display:none"></div>
   </main>
 
   <script src="app.js"></script>
