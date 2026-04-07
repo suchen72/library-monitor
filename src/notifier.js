@@ -271,12 +271,14 @@ function buildReservations(data) {
   return msg;
 }
 
-// --- Return (還書) — 容量計算 ---
+// --- Return (還書) ---
+// 判斷是否「不能續借」：canRenew === false 或有人預約排隊
+function isEffectivelyNonRenewable(book) {
+  return !book.canRenew || (book.reservationCount > 0);
+}
 
 function buildReturnAdvice(data) {
   let msg = '📕 還書建議\n───────\n\n';
-  let hasWarning = false;
-  const returnBooks = [];
 
   for (const account of (data.accounts || [])) {
     if (account.status !== 'ok') continue;
@@ -286,56 +288,73 @@ function buildReturnAdvice(data) {
     const borrowed = account.borrowed || [];
     const reservations = account.reservations || [];
 
-    const A = borrowed.filter(b => {
+    // 1. 可以拿的預約書
+    const readyBooks = reservations.filter(r => r.isReady);
+
+    // 2. 近 2 天到期且不能續借的書
+    const dueSoon = borrowed.filter(b => {
       const days = daysUntil(b.dueDate);
-      return days !== null && days <= 0;
-    }).length;
+      return days !== null && days <= 2 && isEffectivelyNonRenewable(b);
+    }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-    const B = reservations.filter(r => r.isReady).length;
-
+    // 3. 計算是否超限：拿完預約書後的數量
     const currentCount = borrowed.length;
-    const projectedCount = currentCount - A + B;
+    const projectedCount = currentCount + readyBooks.length;
     const overLimit = projectedCount > limit;
 
-    msg += `【${label}】${currentCount}/${limit} 本`;
-    msg += overLimit ? ' ⚠️\n' : ' ✅\n';
-    msg += `到期 ${A} 本｜待取 ${B} 本\n`;
-    msg += `預計 ${projectedCount} 本`;
+    msg += `【${label}】${currentCount}/${limit} 本\n`;
 
+    if (readyBooks.length > 0) {
+      msg += `\n📗 可取預約書（${readyBooks.length} 本）\n`;
+      for (const r of readyBooks) {
+        const branch = shortBranch(r.pickupBranch);
+        const deadline = r.pickupDeadline ? `截止 ${shortDate(r.pickupDeadline)}` : '';
+        msg += `• ${r.title}`;
+        if (branch || deadline) msg += `（${[branch, deadline].filter(Boolean).join('｜')}）`;
+        msg += '\n';
+      }
+    }
+
+    if (dueSoon.length > 0) {
+      msg += `\n📕 近 2 天到期・不可續借（${dueSoon.length} 本）\n`;
+      for (const b of dueSoon) {
+        const days = daysUntil(b.dueDate);
+        const dueLabel = days < 0 ? `逾期 ${Math.abs(days)} 天` : days === 0 ? '今天到期' : `剩 ${days} 天`;
+        const reason = b.reservationCount > 0 ? '有人預約' : '不可續借';
+        msg += `• ${b.title}（${dueLabel}｜${reason}）\n`;
+      }
+    }
+
+    // 4. 超限時，推薦額外歸還的書（不限 2 天，從最近到期的不可續借書開始）
     if (overLimit) {
-      hasWarning = true;
       const excess = projectedCount - limit;
-      msg += `｜超 ${excess} 本\n\n`;
+      msg += `\n⚠️ 取完預約書會超限 ${excess} 本\n`;
 
-      const nonRenewable = borrowed
-        .filter(b => !b.canRenew && b.dueDate)
+      // 從所有不可續借的書中挑（排除已在 dueSoon 列出的）
+      const dueSoonTitles = new Set(dueSoon.map(b => b.title));
+      const extraCandidates = borrowed
+        .filter(b => b.dueDate && isEffectivelyNonRenewable(b) && !dueSoonTitles.has(b.title))
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-      for (const b of nonRenewable.slice(0, excess)) {
-        const days = daysUntil(b.dueDate);
-        const dueLabel = days < 0 ? `逾期 ${Math.abs(days)} 天` : days === 0 ? '今天到期' : `${shortDate(b.dueDate)} 到期`;
-        returnBooks.push({ title: b.title, dueLabel, accountLabel: label });
+      const needed = Math.max(0, excess - dueSoon.length);
+      const extras = extraCandidates.slice(0, needed);
+
+      if (extras.length > 0) {
+        msg += `📌 建議額外歸還（${extras.length} 本）\n`;
+        for (const b of extras) {
+          msg += `• ${b.title}（${shortDate(b.dueDate)} 到期）\n`;
+        }
       }
 
-      if (nonRenewable.length < excess) {
-        msg += `⚠️ 請自行選擇 ${excess - nonRenewable.length} 本歸還\n`;
+      if (dueSoon.length + extras.length < excess) {
+        const remaining = excess - dueSoon.length - extras.length;
+        msg += `⚠️ 還需自行選擇 ${remaining} 本歸還\n`;
       }
-    } else {
-      msg += '\n';
+    } else if (readyBooks.length === 0 && dueSoon.length === 0) {
+      msg += '✅ 沒有需要處理的書\n';
     }
-    msg += '\n';
-  }
 
-  if (returnBooks.length > 0) {
-    msg += `📌 建議歸還（${returnBooks.length} 本）\n`;
-    for (const b of returnBooks) {
-      msg += `• ${b.title}（${b.dueLabel}）\n`;
-    }
     msg += '\n';
-  }
-
-  if (!hasWarning) {
-    msg += '✅ 都在上限內，不需額外還書\n\n';
   }
 
   msg += `🕐 ${shortTime(data.lastUpdated)} 更新`;

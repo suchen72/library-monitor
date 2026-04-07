@@ -196,46 +196,81 @@ describe('buildReservations', () => {
 // --- buildReturnAdvice ---
 
 describe('buildReturnAdvice', () => {
-  it('未超限 → 顯示 ✅', () => {
+  it('沒有待處理的書 → 顯示 ✅', () => {
     const msg = buildReturnAdvice(makeData([
       makeAccount({
         borrowed: [
-          { title: 'Book1', dueDate: daysFromNow(10) },
-          { title: 'Book2', dueDate: daysFromNow(15) },
+          { title: 'Book1', dueDate: daysFromNow(10), canRenew: true, reservationCount: 0 },
         ],
         borrowLimit: 25,
       }),
     ]));
-    assert.ok(msg.includes('✅'));
-    assert.ok(msg.includes('不需額外還書'));
+    assert.ok(msg.includes('沒有需要處理的書'));
   });
 
-  it('超出上限 → 顯示 ⚠️', () => {
-    // 借了 3 本，上限 2，有 1 本待取 → projected = 3 - 0 + 1 = 4 > 2
+  it('可取預約書 → 列出', () => {
+    const msg = buildReturnAdvice(makeData([
+      makeAccount({
+        reservations: [{
+          title: '預約書A', isReady: true,
+          pickupBranch: '舊莊分館', pickupDeadline: daysFromNow(5),
+        }],
+        borrowLimit: 25,
+      }),
+    ]));
+    assert.ok(msg.includes('可取預約書'));
+    assert.ok(msg.includes('預約書A'));
+  });
+
+  it('近 2 天到期且不可續借 → 列出', () => {
     const msg = buildReturnAdvice(makeData([
       makeAccount({
         borrowed: [
-          { title: 'B1', dueDate: daysFromNow(10) },
-          { title: 'B2', dueDate: daysFromNow(10) },
-          { title: 'B3', dueDate: daysFromNow(10) },
+          { title: '快到期書', dueDate: daysFromNow(1), canRenew: false, reservationCount: 0 },
+        ],
+        borrowLimit: 25,
+      }),
+    ]));
+    assert.ok(msg.includes('不可續借'));
+    assert.ok(msg.includes('快到期書'));
+  });
+
+  it('有人預約 → 視為不可續借', () => {
+    const msg = buildReturnAdvice(makeData([
+      makeAccount({
+        borrowed: [
+          { title: '被預約書', dueDate: daysFromNow(1), canRenew: true, reservationCount: 2 },
+        ],
+        borrowLimit: 25,
+      }),
+    ]));
+    assert.ok(msg.includes('有人預約'));
+    assert.ok(msg.includes('被預約書'));
+  });
+
+  it('超限時推薦額外歸還', () => {
+    const msg = buildReturnAdvice(makeData([
+      makeAccount({
+        borrowed: [
+          { title: 'B1', dueDate: daysFromNow(10), canRenew: false, reservationCount: 0 },
+          { title: 'B2', dueDate: daysFromNow(15), canRenew: false, reservationCount: 0 },
         ],
         reservations: [{ title: 'R1', isReady: true }],
         borrowLimit: 2,
       }),
     ]));
-    assert.ok(msg.includes('⚠️'));
+    assert.ok(msg.includes('超限'));
+    assert.ok(msg.includes('建議額外歸還'));
   });
 
   it('使用 account.borrowLimit', () => {
-    // 借 30 本，上限 30 → 剛好不超
     const borrowed = Array.from({ length: 30 }, (_, i) => ({
-      title: `Book${i}`, dueDate: daysFromNow(10),
+      title: `Book${i}`, dueDate: daysFromNow(10), canRenew: true, reservationCount: 0,
     }));
     const msg = buildReturnAdvice(makeData([
       makeAccount({ borrowed, borrowLimit: 30 }),
     ]));
     assert.ok(msg.includes('30/30'));
-    assert.ok(msg.includes('✅'));
   });
 });
 

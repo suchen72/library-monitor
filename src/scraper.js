@@ -286,11 +286,15 @@ async function _parseBorrowedItem(item) {
     const renewBtn = await item.locator('a.btnstyle.bluebg, a[class*="renew"], button').filter({ hasText: /續借/ }).count();
     const canRenew = renewBtn > 0;
 
+    // 預約人數（有人排隊就不能續借）
+    const reserveMatch = fullText.match(/預約人數[:：]\s*(\d+)/);
+    const reservationCount = reserveMatch ? parseInt(reserveMatch[1]) : 0;
+
     // Pickup branch (典藏地)
     const branchMatch = fullText.match(/典藏地[:：]\s*(.+)/);
     const branch = branchMatch ? branchMatch[1].trim() : null;
 
-    return { title, dueDate, renewalCount, canRenew, branch };
+    return { title, dueDate, renewalCount, canRenew, reservationCount, branch };
   } catch {
     return null;
   }
