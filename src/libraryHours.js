@@ -34,11 +34,36 @@ function getTaipeiDateStr(date) {
 }
 
 /**
+ * 解析 YYYY-MM-DD 為台北時間的日期元件
+ * 所有日期邏輯都用此函式，避免 local timezone 和 UTC 的混亂
+ */
+function parseTaipei(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00+08:00');
+  const taipei = new Date(d.getTime() + 8 * 3600000);
+  return {
+    year: taipei.getUTCFullYear(),
+    month: taipei.getUTCMonth(),  // 0-based
+    date: taipei.getUTCDate(),
+    day: taipei.getUTCDay(),      // 0=日 1=一 ... 6=六
+  };
+}
+
+/**
+ * 從 YYYY-MM-DD 往前/後推 n 天，回傳新的 YYYY-MM-DD
+ */
+function shiftDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00+08:00');
+  d.setTime(d.getTime() + n * 86400000);
+  const taipei = new Date(d.getTime() + 8 * 3600000);
+  return taipei.toISOString().slice(0, 10);
+}
+
+/**
  * 判斷是否為每月第一個週四（清館日）
  */
 function isFirstThursday(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00+08:00');
-  return d.getDay() === 4 && d.getDate() <= 7;
+  const { date, day } = parseTaipei(dateStr);
+  return day === 4 && date <= 7;
 }
 
 /**
@@ -70,12 +95,11 @@ function getClosureReason(dateStr) {
  * @returns {string} YYYY-MM-DD
  */
 function getLastOpenDay(deadlineDateStr) {
-  let d = new Date(deadlineDateStr + 'T00:00:00+08:00');
   // 最多往回找 14 天，避免無限迴圈
+  let ds = deadlineDateStr;
   for (let i = 0; i < 14; i++) {
-    const ds = d.toISOString().slice(0, 10);
     if (!isClosed(ds)) return ds;
-    d.setDate(d.getDate() - 1);
+    ds = shiftDays(ds, -1);
   }
   return deadlineDateStr; // fallback
 }
@@ -84,11 +108,8 @@ function getLastOpenDay(deadlineDateStr) {
  * 格式化日期為 M/D（星期X）
  */
 function formatDateWithDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00+08:00');
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  const dow = DAY_NAMES[d.getDay()];
-  return `${m}/${day}（${dow}）`;
+  const { month, date, day } = parseTaipei(dateStr);
+  return `${month + 1}/${date}（${DAY_NAMES[day]}）`;
 }
 
 /**
@@ -99,9 +120,8 @@ function buildClosureCalendar() {
   const today = getTaipeiDateStr();
   let msg = '🏢 開館資訊（未來 7 天）\n───────\n\n';
 
-  const d = new Date(today + 'T00:00:00+08:00');
+  let ds = today;
   for (let i = 0; i < 7; i++) {
-    const ds = d.toISOString().slice(0, 10);
     const label = formatDateWithDay(ds);
     const reason = getClosureReason(ds);
 
@@ -110,7 +130,7 @@ function buildClosureCalendar() {
     } else {
       msg += `${label} ✅ 開館\n`;
     }
-    d.setDate(d.getDate() + 1);
+    ds = shiftDays(ds, 1);
   }
 
   return msg.trim();

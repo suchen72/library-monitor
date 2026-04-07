@@ -432,4 +432,9 @@ module.exports = {
   notifyReservations,
   notifyReturn,
   notifyClosureStatus,
+  // Exported for testing
+  buildAlerts,
+  buildReservations,
+  buildReturnAdvice,
+  buildSummary,
 };

@@ -19,9 +19,27 @@ function getTaipeiDateStr(date) {
   return taipei.toISOString().slice(0, 10);
 }
 
-function isFirstThursday(dateStr) {
+function parseTaipei(dateStr) {
   const d = new Date(dateStr + 'T00:00:00+08:00');
-  return d.getDay() === 4 && d.getDate() <= 7;
+  const taipei = new Date(d.getTime() + 8 * 3600000);
+  return {
+    year: taipei.getUTCFullYear(),
+    month: taipei.getUTCMonth(),
+    date: taipei.getUTCDate(),
+    day: taipei.getUTCDay(),
+  };
+}
+
+function shiftDays(dateStr, n) {
+  const d = new Date(dateStr + 'T00:00:00+08:00');
+  d.setTime(d.getTime() + n * 86400000);
+  const taipei = new Date(d.getTime() + 8 * 3600000);
+  return taipei.toISOString().slice(0, 10);
+}
+
+function isFirstThursday(dateStr) {
+  const { date, day } = parseTaipei(dateStr);
+  return day === 4 && date <= 7;
 }
 
 export function isClosed(dateStr) {
@@ -37,30 +55,25 @@ export function getClosureReason(dateStr) {
 }
 
 export function getLastOpenDay(deadlineDateStr) {
-  let d = new Date(deadlineDateStr + 'T00:00:00+08:00');
+  let ds = deadlineDateStr;
   for (let i = 0; i < 14; i++) {
-    const ds = d.toISOString().slice(0, 10);
     if (!isClosed(ds)) return ds;
-    d.setDate(d.getDate() - 1);
+    ds = shiftDays(ds, -1);
   }
   return deadlineDateStr;
 }
 
 function formatDateWithDay(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00+08:00');
-  const m = d.getMonth() + 1;
-  const day = d.getDate();
-  const dow = DAY_NAMES[d.getDay()];
-  return `${m}/${day}（${dow}）`;
+  const { month, date, day } = parseTaipei(dateStr);
+  return `${month + 1}/${date}（${DAY_NAMES[day]}）`;
 }
 
 export function buildClosureCalendar() {
   const today = getTaipeiDateStr();
   let msg = '🏢 開館資訊（未來 7 天）\n───────\n\n';
 
-  const d = new Date(today + 'T00:00:00+08:00');
+  let ds = today;
   for (let i = 0; i < 7; i++) {
-    const ds = d.toISOString().slice(0, 10);
     const label = formatDateWithDay(ds);
     const reason = getClosureReason(ds);
 
@@ -69,7 +82,7 @@ export function buildClosureCalendar() {
     } else {
       msg += `${label} ✅ 開館\n`;
     }
-    d.setDate(d.getDate() + 1);
+    ds = shiftDays(ds, 1);
   }
 
   return msg.trim();
@@ -84,8 +97,4 @@ export function getTodayStatusLine() {
     return `🏢 今天 ${label}：❌ 休館（${reason}）`;
   }
   return `🏢 今天 ${label}：正常開館`;
-}
-
-export function shortDateWithDay(dateStr) {
-  return formatDateWithDay(dateStr);
 }
