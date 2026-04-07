@@ -41,4 +41,52 @@ function getSessionPath(accountId) {
   return path.join(SESSIONS_DIR, `account-${accountId}.json`);
 }
 
-module.exports = { readAccounts, readData, writeData, getSessionPath };
+async function pushToKV(data) {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const namespaceId = process.env.CF_KV_NAMESPACE_ID;
+  const apiToken = process.env.CF_API_TOKEN;
+
+  if (!accountId || !namespaceId || !apiToken) {
+    console.log('[KV] Skipping push: missing CF credentials');
+    return;
+  }
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/library-data`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (res.ok) {
+    console.log('[KV] Data pushed to Cloudflare KV');
+  } else {
+    const body = await res.text();
+    console.error(`[KV] Push failed (${res.status}): ${body}`);
+  }
+}
+
+async function readFromKV() {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const namespaceId = process.env.CF_KV_NAMESPACE_ID;
+  const apiToken = process.env.CF_API_TOKEN;
+
+  if (!accountId || !namespaceId || !apiToken) {
+    return null;
+  }
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/library-data`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${apiToken}` },
+  });
+
+  if (res.ok) {
+    return await res.json();
+  }
+  return null;
+}
+
+module.exports = { readAccounts, readData, writeData, getSessionPath, pushToKV, readFromKV };

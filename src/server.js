@@ -3,7 +3,7 @@ const cron = require('node-cron');
 const path = require('path');
 const EventEmitter = require('events');
 const { scrapeAll } = require('./scraper');
-const { readData } = require('./dataStore');
+const { readData, readFromKV, pushToKV } = require('./dataStore');
 const { notifyDaily } = require('./notifier');
 
 const app = express();
@@ -16,11 +16,16 @@ let isRefreshing = false;
 // --- Static files ---
 app.use(express.static(path.join(__dirname, '..', 'docs')));
 
-// --- API: Get cached data ---
-app.get('/api/data', (req, res) => {
+// --- API: Get data from KV (single source of truth) ---
+app.get('/api/data', async (req, res) => {
   try {
-    const data = readData();
-    res.json(data);
+    const data = await readFromKV();
+    if (data) {
+      res.json(data);
+    } else {
+      // Fallback to local file if KV unavailable
+      res.json(readData());
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -73,6 +78,7 @@ async function triggerRefresh() {
 
     // Check for alerts and send email notifications
     const latestData = readData();
+    await pushToKV(latestData);
     await notifyDaily(latestData);
   } catch (err) {
     console.error('Refresh failed:', err.message);
@@ -91,5 +97,5 @@ cron.schedule('0 0 * * *', () => {
 // --- Start server ---
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`圖書館儀表板已啟動: http://localhost:${PORT}`);
-  console.log('每天 22:00 自動更新，或點擊儀表板上的「立即更新」手動觸發');
+  console.log('每天 00:00 自動更新，或點擊儀表板上的「立即更新」手動觸發');
 });

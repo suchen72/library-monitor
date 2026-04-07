@@ -260,6 +260,10 @@ tr:hover td { background: #f7fafc; }
 .badge-yes { color: #38a169; font-weight: 600; }
 .badge-no  { color: #a0aec0; }
 
+/* Found checkbox */
+.check-col { text-align: center; }
+.found-check { width: 18px; height: 18px; cursor: pointer; accent-color: #38a169; }
+
 /* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
