@@ -1,6 +1,9 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
-const { readAccounts, writeData, readData, getSessionPath } = require('./dataStore');
+const {
+  readAccounts, writeData, readData, getSessionPath,
+  readHistory, writeHistory, annotateFirstSeen, computeHistoryDiff,
+} = require('./dataStore');
 const captchaSolver = require('./captchaSolver');
 
 const BASE_URL = 'https://book.tpml.edu.tw';
@@ -67,7 +70,20 @@ async function scrapeAll(emitEvent) {
     }
   }
 
-  writeData({ lastUpdated: new Date().toISOString(), accounts: results });
+  const newData = { lastUpdated: new Date().toISOString(), accounts: results };
+
+  // 閱讀歷史：在寫檔前比對舊資料，偵測「真的歸還」並記錄。
+  // 同時回寫 firstSeen 到每本借閱書上（用來推算借閱期間）。
+  annotateFirstSeen(existing, newData);
+  const diffEntries = computeHistoryDiff(existing, newData);
+  if (diffEntries.length > 0) {
+    const history = readHistory();
+    history.entries.push(...diffEntries);
+    writeHistory(history);
+    console.log(`[history] Recorded ${diffEntries.length} returned book(s)`);
+  }
+
+  writeData(newData);
   _emitEvent({ type: 'complete' });
   return results;
 }

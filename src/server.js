@@ -3,7 +3,11 @@ const cron = require('node-cron');
 const path = require('path');
 const EventEmitter = require('events');
 const { scrapeAll } = require('./scraper');
-const { readData, readFromKV, pushToKV, readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV } = require('./dataStore');
+const {
+  readData, readFromKV, pushToKV,
+  readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
+  readHistory, readHistoryFromKV, pushHistoryToKV,
+} = require('./dataStore');
 const { notifyDaily } = require('./notifier');
 
 const app = express();
@@ -94,6 +98,16 @@ app.post('/api/favorites', async (req, res) => {
   }
 });
 
+// --- API: Reading history ---
+app.get('/api/history', async (req, res) => {
+  try {
+    const data = await readHistoryFromKV();
+    res.json(data || readHistory());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.delete('/api/favorites', async (req, res) => {
   try {
     const { title, tag } = req.body;
@@ -131,6 +145,7 @@ async function triggerRefresh() {
     // Check for alerts and send email notifications
     const latestData = readData();
     await pushToKV(latestData);
+    await pushHistoryToKV(readHistory());
     await notifyDaily(latestData);
   } catch (err) {
     console.error('Refresh failed:', err.message);

@@ -1,6 +1,8 @@
 let currentFavorites = [];
-let currentTags = ['包包', '可可貝貝', '大人'];
+let currentTags = ['可可貝貝', '包包', '大人'];
 let favFilterTag = null; // null = show all
+let currentHistory = [];
+let historySearch = '';
 
 const TAG_COLORS = {
   '包包':    { color: '#e53e3e', label: '包' },
@@ -21,7 +23,9 @@ window.addEventListener('DOMContentLoaded', () => {
       document.getElementById('content').style.display = tab === 'dashboard' ? '' : 'none';
       document.getElementById('emptyState').style.display = 'none';
       document.getElementById('favoritesContent').style.display = tab === 'favorites' ? '' : 'none';
+      document.getElementById('historyContent').style.display = tab === 'history' ? '' : 'none';
       if (tab === 'favorites') loadFavorites();
+      if (tab === 'history') loadHistory();
     });
   });
 });
@@ -133,6 +137,110 @@ function renderFavoritesPage() {
 function setFavFilter(tag) {
   favFilterTag = tag;
   renderFavoritesPage();
+}
+
+// --- Reading history ---
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/history');
+    if (!res.ok) throw new Error('Failed to fetch history');
+    const data = await res.json();
+    currentHistory = data.entries || [];
+    renderHistoryPage();
+  } catch (err) {
+    showBanner('error', '無法取得閱讀歷史：' + err.message);
+  }
+}
+
+function setHistorySearch(value) {
+  historySearch = value;
+  renderHistoryPage();
+}
+
+function renderHistoryPage() {
+  // 搜尋框（保留輸入狀態）
+  const searchHtml = `
+    <div class="fav-filters">
+      <input
+        type="search"
+        id="historySearchInput"
+        placeholder="搜尋書名..."
+        value="${escHtml(historySearch)}"
+        oninput="setHistorySearch(this.value)"
+        style="padding:6px 10px;border:1px solid #cbd5e0;border-radius:6px;font-size:14px;min-width:220px"
+      />
+    </div>`;
+
+  const keyword = historySearch.trim().toLowerCase();
+  const filtered = keyword
+    ? currentHistory.filter(e => (e.title || '').toLowerCase().includes(keyword))
+    : currentHistory;
+
+  // 按 returnedDate 降冪（最近歸還在上）
+  const sorted = [...filtered].sort((a, b) =>
+    (b.returnedDate || '').localeCompare(a.returnedDate || '')
+  );
+
+  if (sorted.length === 0) {
+    const empty = currentHistory.length === 0
+      ? '還沒有閱讀紀錄，有書歸還後會自動記錄'
+      : '沒有符合搜尋條件的紀錄';
+    document.getElementById('historyContent').innerHTML = searchHtml +
+      `<div class="section"><div class="section-title">閱讀歷史</div><div class="card-body" style="text-align:center;color:#a0aec0;padding:40px">${empty}</div></div>`;
+    // 保持輸入框 focus
+    const input = document.getElementById('historySearchInput');
+    if (input && document.activeElement !== input && keyword) input.focus();
+    return;
+  }
+
+  const rows = sorted.map(e => {
+    const period = formatPeriod(e.firstSeen, e.returnedDate);
+    const days = computeDaysBetween(e.firstSeen, e.returnedDate);
+    const daysLabel = days == null ? '-' : `${days} 天`;
+    return `<tr>
+      <td>${escHtml(e.title)}</td>
+      <td>${period}</td>
+      <td>${daysLabel}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('historyContent').innerHTML = searchHtml + `<div class="section">
+    <div class="section-title">閱讀歷史（共 ${sorted.length} 本已讀完${keyword ? ` / 符合搜尋` : ''}）</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>書名</th><th>借閱期間</th><th>天數</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+
+  // 搜尋輸入時 innerHTML 重繪，focus 會跑掉，補回來
+  const input = document.getElementById('historySearchInput');
+  if (input && keyword && document.activeElement !== input) {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+
+function formatPeriod(firstSeen, returnedDate) {
+  const f = firstSeen ? shortDate(firstSeen) : '?';
+  const r = returnedDate ? shortDate(returnedDate) : '?';
+  return `${f} ~ ${r}`;
+}
+
+function shortDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function computeDaysBetween(firstSeen, returnedDate) {
+  if (!firstSeen || !returnedDate) return null;
+  const a = new Date(firstSeen);
+  const b = new Date(returnedDate);
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.max(0, Math.floor((b - a) / 86400000));
 }
 
 // --- Trigger refresh ---

@@ -7,7 +7,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { scrapeAll } = require('./scraper');
-const { readData, pushToKV } = require('./dataStore');
+const { readData, pushToKV, readHistory, pushHistoryToKV } = require('./dataStore');
 const { notifyDaily, notifySummary, notifyBorrowed, notifyReservations, notifyReturn, notifyClosureStatus } = require('./notifier');
 const captchaSolver = require('./captchaSolver');
 
@@ -27,6 +27,7 @@ fs.mkdirSync(path.join(__dirname, '..', 'data'), { recursive: true });
 
     const data = readData();
     await pushToKV(data);
+    await pushHistoryToKV(readHistory());
 
     switch (mode) {
       case 'summary':
