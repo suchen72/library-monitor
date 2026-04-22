@@ -7,8 +7,10 @@ const {
   readData, readFromKV, pushToKV,
   readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
   readHistory, readHistoryFromKV, pushHistoryToKV,
+  readWishlist, writeWishlist, pushWishlistToKV, readWishlistFromKV,
 } = require('./dataStore');
 const { notifyDaily } = require('./notifier');
+const { renewBook, renewByAccount } = require('./renewer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -101,11 +103,129 @@ app.post('/api/favorites', async (req, res) => {
 // --- API: Reading history ---
 app.get('/api/history', async (req, res) => {
   try {
-    const data = await readHistoryFromKV();
-    res.json(data || readHistory());
+    const kvData = await readHistoryFromKV();
+    const data = (kvData?.entries?.length > 0) ? kvData : readHistory();
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- API: Wishlist ---
+app.get('/api/wishlist', async (req, res) => {
+  try {
+    const data = await readWishlistFromKV();
+    res.json(data || readWishlist());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wishlist', async (req, res) => {
+  try {
+    const { title, tags, note } = req.body;
+    if (!title) return res.status(400).json({ error: 'title required' });
+
+    const data = readWishlist();
+    const existing = data.wishlist.find(w => w.title === title);
+    if (existing) {
+      if (Array.isArray(tags)) {
+        for (const t of tags) {
+          if (t && !existing.tags.includes(t)) existing.tags.push(t);
+        }
+      }
+      if (note !== undefined) existing.note = note;
+    } else {
+      data.wishlist.push({
+        title,
+        tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
+        note: note || '',
+        dateAdded: new Date().toISOString(),
+      });
+    }
+    writeWishlist(data);
+    await pushWishlistToKV(data);
+    res.json({ status: 'added' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/wishlist', async (req, res) => {
+  try {
+    const { title, tag } = req.body;
+    if (!title) return res.status(400).json({ error: 'title required' });
+
+    const data = readWishlist();
+    if (tag) {
+      const existing = data.wishlist.find(w => w.title === title);
+      if (existing) {
+        existing.tags = existing.tags.filter(t => t !== tag);
+      }
+    } else {
+      data.wishlist = data.wishlist.filter(w => w.title !== title);
+    }
+    writeWishlist(data);
+    await pushWishlistToKV(data);
+    res.json({ status: 'removed' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --- API: Renew books ---
+app.post('/api/renew', async (req, res) => {
+  const { title, accountId } = req.body;
+  if (!title || !accountId) {
+    return res.status(400).json({ error: 'title and accountId required' });
+  }
+  res.json({ status: 'started' });
+
+  renewBook(accountId, title).then(result => {
+    console.log(`[renew] ${result.message}`);
+    events.emit('scrape', { type: 'renew-result', ...result, title, accountId });
+  }).catch(err => {
+    console.error(`[renew] Error:`, err.message);
+    events.emit('scrape', { type: 'renew-result', success: false, message: err.message, title, accountId });
+  });
+});
+
+// Renew renewable books for an account, optionally filtered by due date
+app.post('/api/renew-all', async (req, res) => {
+  const { accountId, beforeDate } = req.body;
+  if (!accountId) {
+    return res.status(400).json({ error: 'accountId required' });
+  }
+
+  // Filter by due date if provided
+  let titles;
+  if (beforeDate) {
+    const data = readData();
+    const account = data.accounts?.find(a => a.id === accountId);
+    if (account) {
+      titles = (account.borrowed || [])
+        .filter(b => b.dueDate && b.dueDate <= beforeDate
+          && b.canRenew && (b.renewalCount ?? 0) < 3 && (b.reservationCount ?? 0) === 0)
+        .map(b => b.title);
+    }
+    if (!titles || titles.length === 0) {
+      events.emit('scrape', { type: 'renew-all-done', accountId, results: [] });
+      return res.json({ status: 'done', message: '沒有符合條件的書' });
+    }
+  }
+
+  res.json({ status: 'started' });
+
+  renewByAccount(accountId, titles).then(({ results }) => {
+    console.log(`[renew-all] ${accountId}: ${results.filter(r => r.success).length} succeeded`);
+    for (const r of results) {
+      events.emit('scrape', { type: 'renew-result', ...r, accountId });
+    }
+    events.emit('scrape', { type: 'renew-all-done', accountId, results });
+  }).catch(err => {
+    console.error(`[renew-all] Error:`, err.message);
+    events.emit('scrape', { type: 'renew-all-done', accountId, results: [{ success: false, message: err.message }] });
+  });
 });
 
 app.delete('/api/favorites', async (req, res) => {

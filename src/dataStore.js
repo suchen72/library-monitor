@@ -6,6 +6,7 @@ const ROOT = path.join(__dirname, '..');
 const DATA_PATH = path.join(ROOT, 'data', 'library-data.json');
 const FAVORITES_PATH = path.join(ROOT, 'data', 'favorites.json');
 const HISTORY_PATH = path.join(ROOT, 'data', 'history.json');
+const WISHLIST_PATH = path.join(ROOT, 'data', 'wishlist.json');
 const SESSIONS_DIR = path.join(ROOT, 'sessions');
 
 function readAccounts() {
@@ -207,6 +208,77 @@ async function readHistoryFromKV() {
   return null;
 }
 
+// --- Wishlist ---
+
+function readWishlist() {
+  if (!fs.existsSync(WISHLIST_PATH)) {
+    return { tags: ['可可貝貝', '包包', '大人'], wishlist: [] };
+  }
+  const data = JSON.parse(fs.readFileSync(WISHLIST_PATH, 'utf8'));
+  if (!data.tags) data.tags = ['可可貝貝', '包包', '大人'];
+  if (!Array.isArray(data.wishlist)) data.wishlist = [];
+  return data;
+}
+
+function writeWishlist(data) {
+  const dir = path.dirname(WISHLIST_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = WISHLIST_PATH + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+  fs.renameSync(tmp, WISHLIST_PATH);
+}
+
+async function pushWishlistToKV(data) {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const namespaceId = process.env.CF_KV_NAMESPACE_ID;
+  const apiToken = process.env.CF_API_TOKEN;
+
+  if (!accountId || !namespaceId || !apiToken) return;
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/wishlist`;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`[KV] Wishlist push failed (${res.status}): ${body}`);
+  }
+}
+
+async function readWishlistFromKV() {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const namespaceId = process.env.CF_KV_NAMESPACE_ID;
+  const apiToken = process.env.CF_API_TOKEN;
+
+  if (!accountId || !namespaceId || !apiToken) return null;
+
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/storage/kv/namespaces/${namespaceId}/values/wishlist`;
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${apiToken}` },
+  });
+
+  if (res.ok) return await res.json();
+  return null;
+}
+
+// --- Pure function: build "owned" title set for wishlist status ---
+
+function buildOwnedTitleSet(libraryData, historyData) {
+  const set = new Set();
+  for (const a of (libraryData?.accounts || [])) {
+    for (const b of (a.borrowed || [])) if (b?.title) set.add(b.title);
+    for (const r of (a.reservations || [])) if (r?.title) set.add(r.title);
+  }
+  for (const e of (historyData?.entries || [])) if (e?.title) set.add(e.title);
+  return set;
+}
+
 // --- Pure functions for scrape-time diff + firstSeen annotation ---
 // 閱讀歷史採全域 title 比對（借書帳號混用，不區分帳號歸屬）。
 
@@ -272,5 +344,7 @@ module.exports = {
   readAccounts, readData, writeData, getSessionPath, pushToKV, readFromKV,
   readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
   readHistory, writeHistory, pushHistoryToKV, readHistoryFromKV,
+  readWishlist, writeWishlist, pushWishlistToKV, readWishlistFromKV,
+  buildOwnedTitleSet,
   annotateFirstSeen, computeHistoryDiff,
 };

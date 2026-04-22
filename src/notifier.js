@@ -406,6 +406,86 @@ async function notifyClosureStatus() {
   await notify(buildClosureStatus(), '圖書館：開館資訊', 'hours');
 }
 
+// --- Auto-renew targets (for daily mode) ---
+
+function getAutoRenewTargets(data) {
+  const targets = [];
+  for (const account of (data.accounts || [])) {
+    if (account.status !== 'ok') continue;
+    const titles = (account.borrowed || [])
+      .filter(b => b.canRenew && (b.renewalCount ?? 0) < 3
+        && (b.reservationCount ?? 0) === 0 && daysUntil(b.dueDate) === 0)
+      .map(b => b.title);
+    if (titles.length > 0) {
+      targets.push({ accountId: account.id, titles });
+    }
+  }
+  return targets;
+}
+
+async function notifyAutoRenew(results) {
+  const succeeded = results.filter(r => r.success);
+  const failed = results.filter(r => !r.success && r.message !== '不可續借');
+
+  let message = '🔄 自動續借結果\n───────\n\n';
+
+  if (succeeded.length > 0) {
+    message += `✅ 成功（${succeeded.length} 本）\n`;
+    for (const r of succeeded) {
+      message += `  • ${r.title}（${r.accountLabel}）\n`;
+    }
+    message += '\n';
+  }
+
+  if (failed.length > 0) {
+    message += `❌ 失敗（${failed.length} 本）\n`;
+    for (const r of failed) {
+      message += `  • ${r.title}（${r.accountLabel}）：${r.message}\n`;
+    }
+    message += '\n';
+  }
+
+  if (succeeded.length === 0 && failed.length === 0) {
+    message += '沒有需要自動續借的書';
+  }
+
+  await notify(message, '圖書館：自動續借結果', 'auto-renew');
+}
+
+async function notifyRenew(results) {
+  const succeeded = results.filter(r => r.success);
+  const failed = results.filter(r => !r.success && r.message !== '不可續借');
+  const skipped = results.filter(r => r.message === '不可續借');
+
+  let message = '📖 續借結果\n\n';
+
+  if (succeeded.length > 0) {
+    message += `✅ 成功（${succeeded.length} 本）\n`;
+    for (const r of succeeded) {
+      message += `  • ${r.title}（${r.accountLabel}）\n`;
+    }
+    message += '\n';
+  }
+
+  if (failed.length > 0) {
+    message += `❌ 失敗（${failed.length} 本）\n`;
+    for (const r of failed) {
+      message += `  • ${r.title}（${r.accountLabel}）：${r.message}\n`;
+    }
+    message += '\n';
+  }
+
+  if (skipped.length > 0) {
+    message += `⏭️ 略過（${skipped.length} 本不可續借）\n`;
+  }
+
+  if (succeeded.length === 0 && failed.length === 0 && skipped.length === 0) {
+    message += '目前沒有需要續借的書';
+  }
+
+  await notify(message, '圖書館：續借結果', 'renew');
+}
+
 async function sendLine(message, label) {
   const lineConfig = readLineConfig();
   if (!lineConfig) return;
@@ -451,6 +531,9 @@ module.exports = {
   notifyReservations,
   notifyReturn,
   notifyClosureStatus,
+  notifyRenew,
+  notifyAutoRenew,
+  getAutoRenewTargets,
   // Exported for testing
   buildAlerts,
   buildReservations,

@@ -8,7 +8,8 @@ const fs = require('fs');
 const path = require('path');
 const { scrapeAll } = require('./scraper');
 const { readData, pushToKV, readHistory, pushHistoryToKV } = require('./dataStore');
-const { notifyDaily, notifySummary, notifyBorrowed, notifyReservations, notifyReturn, notifyClosureStatus } = require('./notifier');
+const { notifyDaily, notifySummary, notifyBorrowed, notifyReservations, notifyReturn, notifyClosureStatus, notifyRenew, notifyAutoRenew } = require('./notifier');
+const { renewAll, autoRenew } = require('./renewer');
 const captchaSolver = require('./captchaSolver');
 
 const mode = process.env.MODE || 'daily';
@@ -21,6 +22,14 @@ fs.mkdirSync(path.join(__dirname, '..', 'data'), { recursive: true });
   console.log(`[run] Starting (mode=${mode}) at ${new Date().toISOString()}`);
 
   try {
+    // Renew mode: skip scrape, just renew all and notify
+    if (mode === 'renew') {
+      const { results } = await renewAll();
+      await notifyRenew(results);
+      console.log('[run] Done (renew)');
+      return;
+    }
+
     await scrapeAll((event) => {
       console.log('[scrape]', event.type, event.label || '');
     });
@@ -28,6 +37,14 @@ fs.mkdirSync(path.join(__dirname, '..', 'data'), { recursive: true });
     const data = readData();
     await pushToKV(data);
     await pushHistoryToKV(readHistory());
+
+    // Auto-renew books due today (daily mode only)
+    if (mode === 'daily') {
+      const { results } = await autoRenew(data);
+      if (results.length > 0) {
+        await notifyAutoRenew(results);
+      }
+    }
 
     switch (mode) {
       case 'summary':

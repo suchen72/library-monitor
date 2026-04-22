@@ -16,6 +16,7 @@ const KEYWORD_MODES = [
   { keywords: ['借閱', 'borrowed'], mode: 'borrowed' },
   { keywords: ['預約', 'reservations'], mode: 'reservations' },
   { keywords: ['還書', 'return'], mode: 'return' },
+  { keywords: ['續借', 'renew'], mode: 'renew' },
 ];
 const DEFAULT_MODE = 'summary';
 
@@ -94,8 +95,8 @@ export default {
           continue;
         }
 
-        // GitHub Actions trigger (daily / refresh)
-        const ghMode = mode === 'refresh' ? 'summary' : 'daily';
+        // GitHub Actions trigger (daily / refresh / renew)
+        const ghMode = mode === 'refresh' ? 'summary' : mode === 'renew' ? 'renew' : 'daily';
         const githubRepo = env.GITHUB_REPO || 'suchen72/library-monitor';
         const ghRes = await fetch(
           `https://api.github.com/repos/${githubRepo}/actions/workflows/${WORKFLOW_FILE}/dispatches`,
@@ -113,7 +114,7 @@ export default {
           }
         );
 
-        const modeLabel = { daily: '每日檢查', refresh: '更新資料' }[mode] || mode;
+        const modeLabel = { daily: '每日檢查', refresh: '更新資料', renew: '續借所有可續借的書' }[mode] || mode;
         const replyText = ghRes.ok
           ? `已觸發「${modeLabel}」，約 3 分鐘後回報結果 📚`
           : `觸發失敗（${ghRes.status}），請稍後再試`;

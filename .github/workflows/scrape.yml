@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'Notification mode: daily, summary, borrowed, reservations, return, hours'
+        description: 'Notification mode: daily, summary, borrowed, reservations, return, hours, renew'
         required: false
         default: 'daily'
 

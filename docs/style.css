@@ -355,6 +355,133 @@ tr:hover td { background: #f7fafc; }
 .check-col { text-align: center; }
 .found-check { width: 18px; height: 18px; cursor: pointer; accent-color: #38a169; }
 
+/* Renew button */
+.renew-btn {
+  background: #2b6cb0;
+  color: white;
+  border: none;
+  padding: 4px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.renew-btn:hover { background: #2c5282; }
+.renew-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.renew-btn.renew-loading {
+  background: #a0aec0;
+}
+.renew-btn.renew-done {
+  background: #38a169;
+  cursor: default;
+}
+.renew-btn.renew-failed {
+  background: #e53e3e;
+  cursor: default;
+}
+.section-title-flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.renew-all-btn {
+  background: #2b6cb0;
+  color: white;
+  border: none;
+  padding: 5px 16px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.renew-all-btn:hover { background: #2c5282; }
+.renew-all-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.renew-before-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.renew-date-input {
+  padding: 4px 8px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.8rem;
+}
+
+/* Wishlist add form */
+.wishlist-form {
+  display: flex;
+  gap: 8px;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.wishlist-form input[type="text"] {
+  padding: 7px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  min-width: 160px;
+}
+.wishlist-form input[type="text"]:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 2px rgba(66,153,225,0.3);
+}
+.wishlist-form button {
+  background: #2b6cb0;
+  color: white;
+  border: none;
+  padding: 7px 18px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.wishlist-form button:hover { background: #2c5282; }
+.wishlist-tag-picker {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.wishlist-tag-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--tag-color, #4a5568);
+  cursor: pointer;
+}
+
+/* Owned badge (wishlist) */
+.badge-owned {
+  display: inline-block;
+  background: #e2e8f0;
+  color: #4a5568;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* Wishlist remove button */
+.remove-btn {
+  background: none;
+  border: 1px solid #e2e8f0;
+  color: #a0aec0;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.remove-btn:hover {
+  background: #fff5f5;
+  color: #e53e3e;
+  border-color: #fc8181;
+}
+
 /* Spinner */
 @keyframes spin { to { transform: rotate(360deg); } }
 .spinner {

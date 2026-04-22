@@ -1,6 +1,9 @@
 let currentFavorites = [];
 let currentTags = ['可可貝貝', '包包', '大人'];
 let favFilterTag = null; // null = show all
+let currentWishlist = [];
+let wishlistFilterTag = null; // null = show all (shared concept, but wishlist has its own)
+let ownedTitleSet = new Set();
 let currentHistory = [];
 let historySearch = '';
 
@@ -33,29 +36,58 @@ window.addEventListener('DOMContentLoaded', () => {
 // --- Load and render ---
 async function loadData() {
   try {
-    const [dataRes, favRes] = await Promise.all([
+    const [dataRes, favRes, wishRes, histRes] = await Promise.all([
       fetch('/api/data'),
       fetch('/api/favorites'),
+      fetch('/api/wishlist'),
+      fetch('/api/history'),
     ]);
     if (!dataRes.ok) throw new Error('Failed to fetch data');
+    const data = await dataRes.json();
     if (favRes.ok) {
       const favData = await favRes.json();
       currentFavorites = favData.favorites || [];
     }
-    renderDashboard(await dataRes.json());
+    if (wishRes.ok) {
+      const wishData = await wishRes.json();
+      currentWishlist = wishData.wishlist || [];
+    }
+    if (histRes.ok) {
+      const histData = await histRes.json();
+      currentHistory = histData.entries || [];
+    }
+    rebuildOwnedTitleSet(data, { entries: currentHistory });
+    renderDashboard(data);
   } catch (err) {
     showBanner('error', '無法取得資料：' + err.message);
   }
 }
 
+function rebuildOwnedTitleSet(data, history) {
+  const set = new Set();
+  for (const a of (data?.accounts || [])) {
+    for (const b of (a.borrowed || [])) if (b?.title) set.add(b.title);
+    for (const r of (a.reservations || [])) if (r?.title) set.add(r.title);
+  }
+  for (const e of (history?.entries || [])) if (e?.title) set.add(e.title);
+  ownedTitleSet = set;
+}
+
 // --- Favorites ---
 async function loadFavorites() {
   try {
-    const res = await fetch('/api/favorites');
-    if (!res.ok) throw new Error('Failed to fetch favorites');
-    const data = await res.json();
+    const [favRes, wishRes] = await Promise.all([
+      fetch('/api/favorites'),
+      fetch('/api/wishlist'),
+    ]);
+    if (!favRes.ok) throw new Error('Failed to fetch favorites');
+    const data = await favRes.json();
     currentFavorites = data.favorites || [];
     currentTags = data.tags || currentTags;
+    if (wishRes.ok) {
+      const wishData = await wishRes.json();
+      currentWishlist = wishData.wishlist || [];
+    }
     renderFavoritesPage();
   } catch (err) {
     showBanner('error', '無法取得最愛清單：' + err.message);
@@ -91,11 +123,14 @@ async function toggleFavorite(title, tag) {
 }
 
 function renderFavoritesPage() {
-  const filtered = favFilterTag
+  const filteredFav = favFilterTag
     ? currentFavorites.filter(f => f.tags.includes(favFilterTag))
     : currentFavorites;
+  const filteredWish = favFilterTag
+    ? currentWishlist.filter(w => w.tags.includes(favFilterTag))
+    : currentWishlist;
 
-  // Filter buttons
+  // Shared filter buttons
   let filterHtml = '<div class="fav-filters">';
   filterHtml += `<button class="filter-btn ${!favFilterTag ? 'active' : ''}" onclick="setFavFilter(null)">全部</button>`;
   for (const tag of currentTags) {
@@ -105,37 +140,128 @@ function renderFavoritesPage() {
   }
   filterHtml += '</div>';
 
-  if (filtered.length === 0) {
-    document.getElementById('favoritesContent').innerHTML = filterHtml +
-      '<div class="section"><div class="section-title">我的最愛</div><div class="card-body" style="text-align:center;color:#a0aec0;padding:40px">還沒有最愛的書籍</div></div>';
-    return;
+  // --- Favorites section ---
+  let favHtml;
+  if (filteredFav.length === 0) {
+    favHtml = '<div class="section"><div class="section-title">我的最愛</div><div class="card-body" style="text-align:center;color:#a0aec0;padding:40px">還沒有最愛的書籍</div></div>';
+  } else {
+    const favRows = filteredFav.map(f => {
+      const tagBadges = (f.tags || []).map(t => {
+        const tc = TAG_COLORS[t] || { color: '#718096', label: t[0] };
+        return `<span class="tag-badge" style="background:${tc.color}">${escHtml(t)}</span>`;
+      }).join(' ');
+      return `<tr>
+        <td>${escHtml(f.title)}</td>
+        <td>${tagBadges}</td>
+        <td>${formatDateTime(f.dateAdded)}</td>
+      </tr>`;
+    }).join('');
+    favHtml = `<div class="section">
+      <div class="section-title">我的最愛（共 ${filteredFav.length} 本）</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>書名</th><th>誰的最愛</th><th>加入日期</th></tr></thead>
+          <tbody>${favRows}</tbody>
+        </table>
+      </div>
+    </div>`;
   }
 
-  const rows = filtered.map(f => {
-    const tagBadges = (f.tags || []).map(t => {
-      const tc = TAG_COLORS[t] || { color: '#718096', label: t[0] };
-      return `<span class="tag-badge" style="background:${tc.color}">${escHtml(t)}</span>`;
-    }).join(' ');
-    return `<tr>
-      <td>${escHtml(f.title)}</td>
-      <td>${tagBadges}</td>
-      <td>${formatDateTime(f.dateAdded)}</td>
-    </tr>`;
-  }).join('');
+  // --- Wishlist add form ---
+  const tagChecks = currentTags.map(tag => {
+    const tc = TAG_COLORS[tag] || { color: '#718096', label: tag[0] };
+    return `<label class="wishlist-tag-label" style="--tag-color:${tc.color}"><input type="checkbox" class="wishlist-tag-check" value="${escHtml(tag)}"> ${escHtml(tag)}</label>`;
+  }).join(' ');
 
-  document.getElementById('favoritesContent').innerHTML = filterHtml + `<div class="section">
-    <div class="section-title">我的最愛（共 ${filtered.length} 本）</div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr><th>書名</th><th>誰的最愛</th><th>加入日期</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
+  const addFormHtml = `<div class="section wishlist-add">
+    <div class="section-title">加入願望清單</div>
+    <div class="wishlist-form">
+      <input id="wishlistTitleInput" type="text" placeholder="書名" />
+      <input id="wishlistNoteInput" type="text" placeholder="備註（選填）" />
+      <div class="wishlist-tag-picker">${tagChecks}</div>
+      <button onclick="addWishlistItem()">加入</button>
     </div>
   </div>`;
+
+  // --- Wishlist section ---
+  let wishHtml;
+  if (filteredWish.length === 0) {
+    wishHtml = '<div class="section"><div class="section-title">願望清單</div><div class="card-body" style="text-align:center;color:#a0aec0;padding:40px">還沒有想借的書</div></div>';
+  } else {
+    const wishRows = filteredWish.map(w => {
+      const tagBadges = (w.tags || []).map(t => {
+        const tc = TAG_COLORS[t] || { color: '#718096', label: t[0] };
+        return `<span class="tag-badge" style="background:${tc.color}">${escHtml(t)}</span>`;
+      }).join(' ');
+      const owned = ownedTitleSet.has(w.title)
+        ? '<span class="badge-owned">已借過</span>'
+        : '—';
+      return `<tr>
+        <td>${escHtml(w.title)}</td>
+        <td>${escHtml(w.note || '')}</td>
+        <td>${tagBadges}</td>
+        <td>${formatDateTime(w.dateAdded)}</td>
+        <td>${owned}</td>
+        <td><button class="remove-btn" onclick="removeWishlistItem('${escHtml(w.title)}')">刪除</button></td>
+      </tr>`;
+    }).join('');
+    wishHtml = `<div class="section">
+      <div class="section-title">願望清單（共 ${filteredWish.length} 本）</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>書名</th><th>備註</th><th>標籤</th><th>加入日期</th><th>狀態</th><th>操作</th></tr></thead>
+          <tbody>${wishRows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('favoritesContent').innerHTML = filterHtml + favHtml + addFormHtml + wishHtml;
 }
 
 function setFavFilter(tag) {
   favFilterTag = tag;
+  renderFavoritesPage();
+}
+
+// --- Wishlist actions ---
+async function addWishlistItem() {
+  const titleInput = document.getElementById('wishlistTitleInput');
+  const noteInput = document.getElementById('wishlistNoteInput');
+  const title = titleInput.value.trim();
+  if (!title) return;
+
+  const tags = Array.from(document.querySelectorAll('.wishlist-tag-check:checked')).map(cb => cb.value);
+  const note = noteInput.value.trim();
+
+  await fetch('/api/wishlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, tags, note }),
+  });
+
+  // Update local state
+  const existing = currentWishlist.find(w => w.title === title);
+  if (existing) {
+    for (const t of tags) { if (!existing.tags.includes(t)) existing.tags.push(t); }
+    if (note) existing.note = note;
+  } else {
+    currentWishlist.push({ title, tags, note, dateAdded: new Date().toISOString() });
+  }
+
+  titleInput.value = '';
+  noteInput.value = '';
+  document.querySelectorAll('.wishlist-tag-check').forEach(cb => cb.checked = false);
+  renderFavoritesPage();
+}
+
+async function removeWishlistItem(title) {
+  await fetch('/api/wishlist', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  currentWishlist = currentWishlist.filter(w => w.title !== title);
   renderFavoritesPage();
 }
 
@@ -369,9 +495,9 @@ function renderBorrowedTable(books) {
         const dueClass = getDueClass(b.dueDate);
         const dueLabel = getDueLabel(b.dueDate);
         const effectivelyNonRenewable = !b.canRenew || (b.renewalCount >= 3) || (b.reservationCount > 0);
-        const canRenew = effectivelyNonRenewable
+        const renewCol = effectivelyNonRenewable
           ? '<span class="badge-no">不可續借</span>'
-          : '<span class="badge-yes">可續借</span>';
+          : `<button class="renew-btn" onclick="doRenew('${escHtml(b.accountId)}', this)" data-title="${escHtml(b.title)}">續借</button>`;
         const reserveCount = (b.reservationCount > 0)
           ? `<span class="badge-overdue">${b.reservationCount} 人</span>`
           : '0';
@@ -388,7 +514,7 @@ function renderBorrowedTable(books) {
           <td class="${dueClass}">${b.dueDate || '-'} ${dueLabel}</td>
           <td>${(b.renewalCount ?? 0) >= 3 ? `<span class="badge-overdue">${b.renewalCount} 次</span>` : `${b.renewalCount ?? '-'} 次`}</td>
           <td>${reserveCount}</td>
-          <td>${canRenew}</td>
+          <td>${renewCol}</td>
           <td class="fav-col">${hearts}</td>
           <td class="check-col"><input type="checkbox" class="found-check"></td>
         </tr>`;
@@ -396,10 +522,14 @@ function renderBorrowedTable(books) {
 
   const overdueCount = sorted.filter(b => getDueClass(b.dueDate) === 'due-overdue').length;
   const overdueNote = overdueCount > 0 ? `，<span class="overdue-count">${overdueCount} 本逾期</span>` : '';
+  const hasRenewable = sorted.some(b => b.canRenew && (b.renewalCount ?? 0) < 3 && (b.reservationCount ?? 0) === 0);
 
   return `
     <div class="section">
-      <div class="section-title">借閱中（共 ${books.length} 本${overdueNote}，依到期日排序）</div>
+      <div class="section-title section-title-flex">
+        <span>借閱中（共 ${books.length} 本${overdueNote}，依到期日排序）</span>
+        ${hasRenewable ? `<span class="renew-before-group"><input type="date" id="renewBeforeDate" class="renew-date-input" value="${defaultRenewDate()}"><button class="renew-all-btn" onclick="doRenewBefore()">續借到期日前的書</button></span>` : ''}
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>帳號</th><th>書名</th><th>到期日</th><th>已續借</th><th>預約</th><th>狀態</th><th>最愛</th><th>找到</th></tr></thead>
@@ -490,6 +620,148 @@ function formatDateTime(iso) {
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+// --- Renew ---
+function defaultRenewDate() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().slice(0, 10);
+}
+
+async function doRenew(accountId, btn) {
+  const title = btn.dataset.title;
+  btn.disabled = true;
+  btn.textContent = '續借中…';
+  btn.classList.add('renew-loading');
+  showBanner('info', `正在續借「${title}」…`);
+
+  try {
+    await fetch('/api/renew', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, accountId }),
+    });
+
+    // Listen for result via SSE
+    const es = new EventSource('/api/refresh-status');
+    const timeout = setTimeout(() => {
+      es.close();
+      btn.textContent = '逾時';
+      btn.classList.remove('renew-loading');
+      showBanner('warning', `續借「${title}」逾時，請稍後確認結果`);
+    }, 60000);
+
+    es.onmessage = (e) => {
+      const event = JSON.parse(e.data);
+      if (event.type === 'renew-result' && event.title === title) {
+        clearTimeout(timeout);
+        es.close();
+        btn.classList.remove('renew-loading');
+        if (event.success) {
+          btn.textContent = '已續借';
+          btn.classList.add('renew-done');
+          showBanner('info', event.message);
+        } else {
+          btn.textContent = '失敗';
+          btn.classList.add('renew-failed');
+          showBanner('error', event.message);
+        }
+      }
+    };
+    es.onerror = () => {
+      clearTimeout(timeout);
+      es.close();
+      btn.textContent = '錯誤';
+      btn.classList.remove('renew-loading');
+    };
+  } catch (err) {
+    btn.textContent = '錯誤';
+    btn.classList.remove('renew-loading');
+    showBanner('error', '觸發續借失敗：' + err.message);
+  }
+}
+
+async function doRenewBefore() {
+  const btn = document.querySelector('.renew-all-btn');
+  const dateInput = document.getElementById('renewBeforeDate');
+  if (!btn || !dateInput) return;
+
+  const beforeDate = dateInput.value;
+  if (!beforeDate) {
+    showBanner('warning', '請選擇到期日期');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '續借中…';
+  showBanner('info', `正在續借 ${beforeDate} 前到期的書…`);
+
+  // Collect unique accountIds from the current data
+  const accountIds = [...new Set(
+    document.querySelectorAll('.renew-btn:not(:disabled)')
+  )].map(b => b.getAttribute('onclick')?.match(/'(account\d+)'/)?.[1]).filter(Boolean);
+
+  const uniqueIds = [...new Set(accountIds)];
+  const allResults = [];
+
+  for (const accountId of uniqueIds) {
+    try {
+      const resp = await fetch('/api/renew-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, beforeDate }),
+      });
+
+      const body = await resp.json();
+      if (body.status === 'done') continue; // no matching books for this account
+
+      // Wait for renew-all-done SSE event
+      await new Promise((resolve) => {
+        const es = new EventSource('/api/refresh-status');
+        const timeout = setTimeout(() => { es.close(); resolve(); }, 120000);
+        es.onmessage = (e) => {
+          const event = JSON.parse(e.data);
+          if (event.type === 'renew-result' && event.accountId === accountId) {
+            allResults.push(event);
+            // Update individual buttons
+            const btns = document.querySelectorAll(`.renew-btn[data-title="${CSS.escape(event.title)}"]`);
+            btns.forEach(b => {
+              b.disabled = true;
+              b.classList.remove('renew-loading');
+              if (event.success) {
+                b.textContent = '已續借';
+                b.classList.add('renew-done');
+              } else if (event.message !== '不可續借') {
+                b.textContent = '失敗';
+                b.classList.add('renew-failed');
+              }
+            });
+          }
+          if (event.type === 'renew-all-done' && event.accountId === accountId) {
+            clearTimeout(timeout);
+            es.close();
+            resolve();
+          }
+        };
+        es.onerror = () => { clearTimeout(timeout); es.close(); resolve(); };
+      });
+    } catch (err) {
+      console.error(`renew-before error for ${accountId}:`, err);
+    }
+  }
+
+  const succeeded = allResults.filter(r => r.success).length;
+  const failed = allResults.filter(r => !r.success && r.message !== '不可續借').length;
+  btn.disabled = false;
+  btn.textContent = '續借到期日前的書';
+
+  if (succeeded > 0 || failed > 0) {
+    showBanner(failed > 0 ? 'warning' : 'info',
+      `續借完成：${succeeded} 本成功${failed > 0 ? `，${failed} 本失敗` : ''}`);
+  } else {
+    showBanner('info', '沒有符合條件的書需要續借');
+  }
 }
 
 function escHtml(str) {
