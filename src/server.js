@@ -11,6 +11,8 @@ const {
 } = require('./dataStore');
 const { notifyDaily } = require('./notifier');
 const { renewBook, renewByAccount } = require('./renewer');
+const { searchCatalog } = require('./catalogSearch');
+const { reserveBook } = require('./reserver');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -121,9 +123,21 @@ app.get('/api/wishlist', async (req, res) => {
   }
 });
 
+app.post('/api/catalog-search', async (req, res) => {
+  const { keyword } = req.body;
+  if (!keyword) return res.status(400).json({ error: 'keyword required' });
+  try {
+    const results = await searchCatalog(keyword, 10);
+    res.json({ results });
+  } catch (err) {
+    console.error('[catalog-search] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/wishlist', async (req, res) => {
   try {
-    const { title, tags, note } = req.body;
+    const { title, tags, note, bookId, holdings, reservable, waitingCount } = req.body;
     if (!title) return res.status(400).json({ error: 'title required' });
 
     const data = readWishlist();
@@ -135,12 +149,20 @@ app.post('/api/wishlist', async (req, res) => {
         }
       }
       if (note !== undefined) existing.note = note;
+      if (bookId) existing.bookId = bookId;
+      if (holdings !== undefined) existing.holdings = holdings;
+      if (reservable !== undefined) existing.reservable = reservable;
+      if (waitingCount !== undefined) existing.waitingCount = waitingCount;
     } else {
       data.wishlist.push({
         title,
         tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
         note: note || '',
         dateAdded: new Date().toISOString(),
+        ...(bookId && { bookId }),
+        ...(holdings !== undefined && { holdings }),
+        ...(reservable !== undefined && { reservable }),
+        ...(waitingCount !== undefined && { waitingCount }),
       });
     }
     writeWishlist(data);
@@ -226,6 +248,23 @@ app.post('/api/renew-all', async (req, res) => {
     console.error(`[renew-all] Error:`, err.message);
     events.emit('scrape', { type: 'renew-all-done', accountId, results: [{ success: false, message: err.message }] });
   });
+});
+
+// --- API: Reserve books ---
+app.post('/api/reserve', async (req, res) => {
+  const { accountId, bookId, title } = req.body;
+  if (!accountId || !bookId) {
+    return res.status(400).json({ error: 'accountId and bookId required' });
+  }
+  try {
+    console.log(`[reserve] Reserving "${title}" (bookId=${bookId}) for ${accountId}`);
+    const result = await reserveBook(accountId, bookId);
+    console.log(`[reserve] ${result.message}`);
+    res.json(result);
+  } catch (err) {
+    console.error(`[reserve] Error:`, err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 app.delete('/api/favorites', async (req, res) => {

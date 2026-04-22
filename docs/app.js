@@ -6,6 +6,8 @@ let wishlistFilterTag = null; // null = show all (shared concept, but wishlist h
 let ownedTitleSet = new Set();
 let currentHistory = [];
 let historySearch = '';
+let currentAccounts = [];
+let currentData = null;
 
 const TAG_COLORS = {
   '包包':    { color: '#e53e3e', label: '包' },
@@ -56,6 +58,11 @@ async function loadData() {
       const histData = await histRes.json();
       currentHistory = histData.entries || [];
     }
+    currentAccounts = (data.accounts || []).map(a => ({
+      id: a.id, label: a.label || a.id,
+      reserveCount: (a.reservations || []).length,
+    }));
+    currentData = data;
     rebuildOwnedTitleSet(data, { entries: currentHistory });
     renderDashboard(data);
   } catch (err) {
@@ -167,7 +174,7 @@ function renderFavoritesPage() {
     </div>`;
   }
 
-  // --- Wishlist add form ---
+  // --- Wishlist add form (with catalog search) ---
   const tagChecks = currentTags.map(tag => {
     const tc = TAG_COLORS[tag] || { color: '#718096', label: tag[0] };
     return `<label class="wishlist-tag-label" style="--tag-color:${tc.color}"><input type="checkbox" class="wishlist-tag-check" value="${escHtml(tag)}"> ${escHtml(tag)}</label>`;
@@ -176,12 +183,23 @@ function renderFavoritesPage() {
   const addFormHtml = `<div class="section wishlist-add">
     <div class="section-title">加入願望清單</div>
     <div class="wishlist-form">
-      <input id="wishlistTitleInput" type="text" placeholder="書名" />
+      <input id="wishlistTitleInput" type="text" placeholder="輸入書名搜尋館藏" />
       <input id="wishlistNoteInput" type="text" placeholder="備註（選填）" />
       <div class="wishlist-tag-picker">${tagChecks}</div>
-      <button onclick="addWishlistItem()">加入</button>
+      <button onclick="searchAndAddWishlist()">搜尋館藏</button>
     </div>
+    <div id="catalogSearchResults"></div>
   </div>`;
+
+  // --- Reservation quota summary ---
+  const RESERVE_LIMIT = 7;
+  let quotaHtml = '<div class="account-summary" style="margin-top:16px">';
+  for (const a of currentAccounts) {
+    const remain = Math.max(0, RESERVE_LIMIT - a.reserveCount);
+    const color = remain === 0 ? '#e53e3e' : remain <= 2 ? '#d69e2e' : '#38a169';
+    quotaHtml += `<div class="account-badge"><span style="color:${color};font-weight:700">●</span> ${escHtml(a.label)}：剩 ${remain} 本可預約</div>`;
+  }
+  quotaHtml += '</div>';
 
   // --- Wishlist section ---
   let wishHtml;
@@ -196,27 +214,37 @@ function renderFavoritesPage() {
       const owned = ownedTitleSet.has(w.title)
         ? '<span class="badge-owned">已借過</span>'
         : '—';
+      const holdingsInfo = w.bookId
+        ? `${w.holdings ?? '-'} / ${w.reservable ?? '-'} / ${w.waitingCount ?? '-'}`
+        : '—';
+      const acctOptions = currentAccounts.map(a => {
+        const remain = Math.max(0, RESERVE_LIMIT - a.reserveCount);
+        return `<option value="${escHtml(a.id)}" ${remain === 0 ? 'disabled' : ''}>${escHtml(a.label)}(${remain})</option>`;
+      }).join('');
+      const reserveBtn = w.bookId
+        ? `<select class="reserve-acct-select">${acctOptions}</select><button class="reserve-btn" onclick="reserveBook('${escHtml(w.bookId)}', '${escHtml(w.title)}', this)">預約</button>`
+        : '';
       return `<tr>
         <td>${escHtml(w.title)}</td>
         <td>${escHtml(w.note || '')}</td>
         <td>${tagBadges}</td>
-        <td>${formatDateTime(w.dateAdded)}</td>
+        <td>${holdingsInfo}</td>
         <td>${owned}</td>
-        <td><button class="remove-btn" onclick="removeWishlistItem('${escHtml(w.title)}')">刪除</button></td>
+        <td>${reserveBtn} <button class="remove-btn" onclick="removeWishlistItem('${escHtml(w.title)}')">刪除</button></td>
       </tr>`;
     }).join('');
     wishHtml = `<div class="section">
       <div class="section-title">願望清單（共 ${filteredWish.length} 本）</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>書名</th><th>備註</th><th>標籤</th><th>加入日期</th><th>狀態</th><th>操作</th></tr></thead>
+          <thead><tr><th>書名</th><th>備註</th><th>標籤</th><th>館藏/可預約/等待</th><th>狀態</th><th>操作</th></tr></thead>
           <tbody>${wishRows}</tbody>
         </table>
       </div>
     </div>`;
   }
 
-  document.getElementById('favoritesContent').innerHTML = filterHtml + favHtml + addFormHtml + wishHtml;
+  document.getElementById('favoritesContent').innerHTML = filterHtml + favHtml + addFormHtml + quotaHtml + wishHtml;
 }
 
 function setFavFilter(tag) {
@@ -225,34 +253,162 @@ function setFavFilter(tag) {
 }
 
 // --- Wishlist actions ---
-async function addWishlistItem() {
+async function searchAndAddWishlist() {
   const titleInput = document.getElementById('wishlistTitleInput');
-  const noteInput = document.getElementById('wishlistNoteInput');
-  const title = titleInput.value.trim();
-  if (!title) return;
+  const keyword = titleInput.value.trim();
+  if (!keyword) return;
 
+  const resultsDiv = document.getElementById('catalogSearchResults');
+  resultsDiv.innerHTML = '<div class="catalog-loading">搜尋館藏中…（約需 5-8 秒）</div>';
+
+  try {
+    const res = await fetch('/api/catalog-search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword }),
+    });
+    const { results, error } = await res.json();
+
+    if (error) {
+      resultsDiv.innerHTML = `<div class="catalog-empty">搜尋失敗：${escHtml(error)}</div>`;
+      return;
+    }
+
+    if (!results || results.length === 0) {
+      resultsDiv.innerHTML = '<div class="catalog-empty">找不到館藏，請換個關鍵字試試</div>';
+      return;
+    }
+
+    const rows = results.map(r => `<tr class="catalog-item" onclick="pickCatalogItem(this)" data-book="${escHtml(JSON.stringify(r))}">
+      <td>${escHtml(r.title)}</td>
+      <td>${r.holdings}</td>
+      <td>${r.available}</td>
+      <td>${r.reservable}</td>
+      <td>${r.waitingCount}</td>
+      <td><button class="add-wish-btn" onclick="event.stopPropagation(); addFromCatalog(this.closest('tr'))">加入</button></td>
+    </tr>`).join('');
+
+    resultsDiv.innerHTML = `<div class="catalog-results">
+      <div class="catalog-title">搜尋結果（${results.length} 筆）— 點選「加入」新增到願望清單</div>
+      <table>
+        <thead><tr><th>書名</th><th>館藏</th><th>在館</th><th>可預約</th><th>等待</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  } catch (err) {
+    resultsDiv.innerHTML = `<div class="catalog-empty">搜尋失敗：${escHtml(err.message)}</div>`;
+  }
+}
+
+async function addFromCatalog(row) {
+  const book = JSON.parse(row.dataset.book);
+  const noteInput = document.getElementById('wishlistNoteInput');
   const tags = Array.from(document.querySelectorAll('.wishlist-tag-check:checked')).map(cb => cb.value);
   const note = noteInput.value.trim();
 
   await fetch('/api/wishlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, tags, note }),
+    body: JSON.stringify({
+      title: book.title, tags, note,
+      bookId: book.bookId,
+      holdings: book.holdings,
+      reservable: book.reservable,
+      waitingCount: book.waitingCount,
+    }),
   });
 
   // Update local state
-  const existing = currentWishlist.find(w => w.title === title);
+  const existing = currentWishlist.find(w => w.title === book.title);
   if (existing) {
     for (const t of tags) { if (!existing.tags.includes(t)) existing.tags.push(t); }
     if (note) existing.note = note;
+    existing.bookId = book.bookId;
+    existing.holdings = book.holdings;
+    existing.reservable = book.reservable;
+    existing.waitingCount = book.waitingCount;
   } else {
-    currentWishlist.push({ title, tags, note, dateAdded: new Date().toISOString() });
+    currentWishlist.push({
+      title: book.title, tags, note,
+      bookId: book.bookId, holdings: book.holdings,
+      reservable: book.reservable, waitingCount: book.waitingCount,
+      dateAdded: new Date().toISOString(),
+    });
   }
 
-  titleInput.value = '';
+  // Mark row as added
+  row.classList.add('catalog-added');
+  row.querySelector('.add-wish-btn').textContent = '已加入';
+  row.querySelector('.add-wish-btn').disabled = true;
+
   noteInput.value = '';
   document.querySelectorAll('.wishlist-tag-check').forEach(cb => cb.checked = false);
   renderFavoritesPage();
+}
+
+async function reserveBook(bookId, title, btn) {
+  const select = btn.previousElementSibling;
+  const accountId = select.value;
+  if (!accountId) {
+    showBanner('warning', '請選擇帳號');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '預約中…';
+  showBanner('info', `正在預約「${title}」…（約需 10-15 秒）`);
+
+  try {
+    const res = await fetch('/api/reserve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId, bookId, title }),
+    });
+    const result = await res.json();
+
+    if (result.success) {
+      showBanner('info', `預約成功：${title}`);
+
+      // 1. Remove from wishlist
+      fetch('/api/wishlist', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+      currentWishlist = currentWishlist.filter(w => w.title !== title);
+
+      // 2. Update reservation count
+      const acct = currentAccounts.find(a => a.id === accountId);
+      if (acct) acct.reserveCount++;
+
+      // 3. Optimistically add to dashboard reservations
+      if (currentData) {
+        const acctData = currentData.accounts?.find(a => a.id === accountId);
+        if (acctData) {
+          acctData.reservations = acctData.reservations || [];
+          acctData.reservations.push({
+            title,
+            pickupBranch: 'I22親子美育數位館',
+            isReady: false,
+            isInTransit: false,
+            status: '排隊中',
+            queuePosition: null,
+          });
+        }
+        renderDashboard(currentData);
+      }
+
+      renderFavoritesPage();
+    } else {
+      btn.disabled = false;
+      btn.textContent = '預約';
+      showBanner('error', `預約失敗：${result.message}`);
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '預約';
+    showBanner('error', `預約錯誤：${err.message}`);
+  }
 }
 
 async function removeWishlistItem(title) {
