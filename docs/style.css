@@ -548,6 +548,44 @@ tr:hover td { background: #f7fafc; }
   color: #4a5568;
   margin-bottom: 8px;
 }
+.catalog-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.catalog-filters,
+.catalog-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.catalog-filter-btn,
+.catalog-secondary-btn {
+  background: #fff;
+  border: 1px solid #cbd5e0;
+  color: #4a5568;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.catalog-filter-btn.active {
+  background: #2b6cb0;
+  border-color: #2b6cb0;
+  color: #fff;
+}
+.catalog-secondary-btn:hover,
+.catalog-filter-btn:hover {
+  border-color: #2b6cb0;
+}
+.catalog-hint {
+  color: #718096;
+  font-size: 0.8rem;
+}
 .catalog-results table {
   width: 100%;
   font-size: 0.85rem;
@@ -555,6 +593,51 @@ tr:hover td { background: #f7fafc; }
 .catalog-item { cursor: pointer; }
 .catalog-item:hover { background: #f7fafc; }
 .catalog-item.catalog-added { opacity: 0.5; }
+.catalog-disabled {
+  color: #a0aec0;
+  cursor: default;
+}
+.catalog-disabled:hover { background: transparent; }
+.catalog-select {
+  width: 16px;
+  height: 16px;
+}
+.catalog-book-title {
+  color: #2d3748;
+  font-weight: 600;
+}
+.catalog-book-meta {
+  color: #718096;
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+.catalog-type {
+  display: inline-block;
+  border: 1px solid #cbd5e0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.catalog-type-book {
+  color: #276749;
+  border-color: #9ae6b4;
+  background: #f0fff4;
+}
+.catalog-type-av {
+  color: #744210;
+  border-color: #fbd38d;
+  background: #fffaf0;
+}
+.catalog-type-electronic {
+  color: #2c5282;
+  border-color: #90cdf4;
+  background: #ebf8ff;
+}
+.catalog-type-other {
+  color: #4a5568;
+  background: #f7fafc;
+}
 .add-wish-btn {
   background: #38a169;
   color: white;

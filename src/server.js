@@ -8,6 +8,7 @@ const {
   readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
   readHistory, readHistoryFromKV, pushHistoryToKV,
   readWishlist, writeWishlist, pushWishlistToKV, readWishlistFromKV,
+  repairWishlistTags, addOrUpdateWishlistItems,
 } = require('./dataStore');
 const { notifyDaily } = require('./notifier');
 const { renewBook, renewByAccount } = require('./renewer');
@@ -125,9 +126,11 @@ app.get('/api/wishlist', async (req, res) => {
 
 app.post('/api/catalog-search', async (req, res) => {
   const { keyword } = req.body;
+  const requestedLimit = Number.parseInt(req.body.limit, 10);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 50;
   if (!keyword) return res.status(400).json({ error: 'keyword required' });
   try {
-    const results = await searchCatalog(keyword, 10);
+    const results = await searchCatalog(keyword, limit);
     res.json({ results });
   } catch (err) {
     console.error('[catalog-search] Error:', err.message);
@@ -137,37 +140,43 @@ app.post('/api/catalog-search', async (req, res) => {
 
 app.post('/api/wishlist', async (req, res) => {
   try {
-    const { title, tags, note, bookId, holdings, reservable, waitingCount } = req.body;
+    const { title } = req.body;
     if (!title) return res.status(400).json({ error: 'title required' });
 
     const data = readWishlist();
-    const existing = data.wishlist.find(w => w.title === title);
-    if (existing) {
-      if (Array.isArray(tags)) {
-        for (const t of tags) {
-          if (t && !existing.tags.includes(t)) existing.tags.push(t);
-        }
-      }
-      if (note !== undefined) existing.note = note;
-      if (bookId) existing.bookId = bookId;
-      if (holdings !== undefined) existing.holdings = holdings;
-      if (reservable !== undefined) existing.reservable = reservable;
-      if (waitingCount !== undefined) existing.waitingCount = waitingCount;
-    } else {
-      data.wishlist.push({
-        title,
-        tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
-        note: note || '',
-        dateAdded: new Date().toISOString(),
-        ...(bookId && { bookId }),
-        ...(holdings !== undefined && { holdings }),
-        ...(reservable !== undefined && { reservable }),
-        ...(waitingCount !== undefined && { waitingCount }),
-      });
-    }
+    const result = addOrUpdateWishlistItems(data, req.body);
     writeWishlist(data);
     await pushWishlistToKV(data);
-    res.json({ status: 'added' });
+    res.json({ status: result.added ? 'added' : 'updated', ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wishlist/bulk', async (req, res) => {
+  try {
+    const { items } = req.body;
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'items array required' });
+
+    const data = readWishlist();
+    const result = addOrUpdateWishlistItems(data, items);
+    writeWishlist(data);
+    await pushWishlistToKV(data);
+    res.json({ status: 'ok', ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/wishlist/repair-tags', async (req, res) => {
+  try {
+    const data = readWishlist();
+    const { changed } = repairWishlistTags(data);
+    if (changed) {
+      writeWishlist(data);
+      await pushWishlistToKV(data);
+    }
+    res.json({ status: changed ? 'repaired' : 'unchanged' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

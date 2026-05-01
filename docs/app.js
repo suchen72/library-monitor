@@ -13,6 +13,9 @@ let currentHistory = [];
 let historySearch = '';
 let currentAccounts = [];
 let currentData = null;
+let catalogSearchResults = [];
+let catalogTypeFilter = 'physical';
+let catalogSelectedBookIds = new Set();
 
 const TAG_COLORS = {
   '包包':    { color: '#e53e3e', label: '包' },
@@ -326,7 +329,7 @@ async function searchAndAddWishlist() {
     const res = await fetch('/api/catalog-search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyword }),
+      body: JSON.stringify({ keyword, limit: 50 }),
     });
     const { results, error } = await res.json();
 
@@ -336,75 +339,232 @@ async function searchAndAddWishlist() {
     }
 
     if (!results || results.length === 0) {
+      catalogSearchResults = [];
+      catalogSelectedBookIds = new Set();
       resultsDiv.innerHTML = '<div class="catalog-empty">找不到館藏，請換個關鍵字試試</div>';
       return;
     }
 
-    const rows = results.map(r => `<tr class="catalog-item" onclick="pickCatalogItem(this)" data-book="${escHtml(JSON.stringify(r))}">
-      <td>${escHtml(r.title)}</td>
-      <td>${r.holdings}</td>
-      <td>${r.available}</td>
-      <td>${r.reservable}</td>
-      <td>${r.waitingCount}</td>
-      <td><button class="add-wish-btn" onclick="event.stopPropagation(); addFromCatalog(this.closest('tr'))">加入</button></td>
-    </tr>`).join('');
-
-    resultsDiv.innerHTML = `<div class="catalog-results">
-      <div class="catalog-title">搜尋結果（${results.length} 筆）— 點選「加入」新增到願望清單</div>
-      <table>
-        <thead><tr><th>書名</th><th>館藏</th><th>在館</th><th>可預約</th><th>等待</th><th></th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-    </div>`;
+    catalogSearchResults = results;
+    catalogSelectedBookIds = new Set();
+    renderCatalogSearchResults();
   } catch (err) {
     resultsDiv.innerHTML = `<div class="catalog-empty">搜尋失敗：${escHtml(err.message)}</div>`;
   }
 }
 
-async function addFromCatalog(row) {
-  const book = JSON.parse(row.dataset.book);
+function catalogTypeOf(book) {
+  const raw = `${book.dataType || ''}`.toLowerCase();
+  if (raw.includes('eresource') || raw.includes('電子')) return 'electronic';
+  if (raw.includes('book') || raw.includes('圖書')) return 'book';
+  if (raw.includes('audiovisual') || raw.includes('.av') || raw.includes('視聽')) return 'av';
+  return 'other';
+}
+
+function catalogTypeLabel(book) {
+  const type = catalogTypeOf(book);
+  if (type === 'book') return '圖書';
+  if (type === 'av') return '視聽資料';
+  if (type === 'electronic') return '電子資源';
+  return book.dataType || '其他';
+}
+
+function isCatalogItemEligible(book) {
+  return catalogTypeOf(book) !== 'electronic'
+    && !!book.bookId
+    && (book.reservable ?? 0) > 0
+    && !currentWishlist.some(w => w.title === book.title)
+    && !ownedTitleSet.has(book.title);
+}
+
+function catalogItemStatus(book) {
+  if (currentWishlist.some(w => w.title === book.title)) return '已在願望清單';
+  if (ownedTitleSet.has(book.title)) return '已借過/預約過';
+  if (catalogTypeOf(book) === 'electronic') return '電子資源不可預約';
+  if (!book.bookId) return '無館藏編號';
+  if ((book.reservable ?? 0) <= 0) return '目前不可預約';
+  return '可加入';
+}
+
+function filteredCatalogResults() {
+  return catalogSearchResults.filter(book => {
+    const type = catalogTypeOf(book);
+    if (catalogTypeFilter === 'physical' && (type === 'electronic' || (book.reservable ?? 0) <= 0)) return false;
+    if (catalogTypeFilter !== 'physical' && catalogTypeFilter !== 'all' && type !== catalogTypeFilter) return false;
+    return true;
+  });
+}
+
+function renderCatalogSearchResults() {
+  const resultsDiv = document.getElementById('catalogSearchResults');
+  if (!resultsDiv || catalogSearchResults.length === 0) return;
+
+  const visibleResults = filteredCatalogResults();
+  const hiddenElectronic = catalogSearchResults.filter(r => catalogTypeOf(r) === 'electronic').length;
+  const hiddenUnreservable = catalogSearchResults.filter(r => catalogTypeOf(r) !== 'electronic' && (r.reservable ?? 0) <= 0).length;
+  const selectedCount = visibleResults.filter(r => catalogSelectedBookIds.has(r.bookId) && isCatalogItemEligible(r)).length;
+  const eligibleVisible = visibleResults.filter(isCatalogItemEligible);
+  const allEligibleSelected = eligibleVisible.length > 0 && eligibleVisible.every(r => catalogSelectedBookIds.has(r.bookId));
+
+  const filterBtn = (label, value) =>
+    `<button class="catalog-filter-btn ${catalogTypeFilter === value ? 'active' : ''}" onclick="setCatalogTypeFilter('${value}')">${label}</button>`;
+
+  const rows = visibleResults.map(r => {
+    const eligible = isCatalogItemEligible(r);
+    const checked = catalogSelectedBookIds.has(r.bookId) && eligible ? 'checked' : '';
+    const type = catalogTypeOf(r);
+    return `<tr class="catalog-item ${!eligible ? 'catalog-disabled' : ''}">
+      <td><input type="checkbox" class="catalog-select" ${checked} ${eligible ? '' : 'disabled'} onchange="toggleCatalogSelection('${escHtml(r.bookId)}', this.checked)"></td>
+      <td>
+        <div class="catalog-book-title">${escHtml(r.title)}</div>
+        <div class="catalog-book-meta">${escHtml([r.author, r.imprint].filter(Boolean).join(' · '))}</div>
+      </td>
+      <td><span class="catalog-type catalog-type-${type}">${escHtml(catalogTypeLabel(r))}</span></td>
+      <td>${r.holdings ?? '-'}</td>
+      <td>${r.available ?? '-'}</td>
+      <td>${r.reservable ?? '-'}</td>
+      <td>${r.waitingCount ?? '-'}</td>
+      <td>${escHtml(catalogItemStatus(r))}</td>
+      <td><button class="add-wish-btn" ${eligible ? '' : 'disabled'} onclick="addCatalogBookById('${escHtml(r.bookId)}')">${currentWishlist.some(w => w.title === r.title) ? '已加入' : '加入'}</button></td>
+    </tr>`;
+  }).join('');
+
+  resultsDiv.innerHTML = `<div class="catalog-results">
+    <div class="catalog-title">搜尋結果（${catalogSearchResults.length} 筆）</div>
+    <div class="catalog-toolbar">
+      <div class="catalog-filters">
+        ${filterBtn('可預約資料', 'physical')}
+        ${filterBtn('圖書', 'book')}
+        ${filterBtn('視聽資料', 'av')}
+        ${filterBtn('電子資源', 'electronic')}
+        ${filterBtn('全部', 'all')}
+      </div>
+      <div class="catalog-actions">
+        ${catalogTypeFilter === 'physical' && (hiddenElectronic > 0 || hiddenUnreservable > 0) ? `<span class="catalog-hint">已隱藏 ${[
+          hiddenElectronic > 0 ? `${hiddenElectronic} 筆電子資源` : '',
+          hiddenUnreservable > 0 ? `${hiddenUnreservable} 筆不可預約` : '',
+        ].filter(Boolean).join('、')}</span>` : ''}
+        <button class="catalog-secondary-btn" onclick="toggleAllCatalogSelection(${!allEligibleSelected})">${allEligibleSelected ? '取消全選' : '全選可加入'}</button>
+        <button class="add-wish-btn" ${selectedCount === 0 ? 'disabled' : ''} onclick="addSelectedCatalogBooks()">加入選取的 ${selectedCount} 本</button>
+      </div>
+    </div>
+    ${visibleResults.length === 0 ? '<div class="catalog-empty">這個篩選沒有結果</div>' : `<table>
+      <thead><tr><th></th><th>書名</th><th>類型</th><th>館藏</th><th>在館</th><th>可預約</th><th>等待</th><th>狀態</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`}
+  </div>`;
+}
+
+function setCatalogTypeFilter(filter) {
+  catalogTypeFilter = filter;
+  renderCatalogSearchResults();
+}
+
+function toggleCatalogSelection(bookId, checked) {
+  if (checked) catalogSelectedBookIds.add(bookId);
+  else catalogSelectedBookIds.delete(bookId);
+  renderCatalogSearchResults();
+}
+
+function toggleAllCatalogSelection(checked) {
+  for (const book of filteredCatalogResults()) {
+    if (!isCatalogItemEligible(book)) continue;
+    if (checked) catalogSelectedBookIds.add(book.bookId);
+    else catalogSelectedBookIds.delete(book.bookId);
+  }
+  renderCatalogSearchResults();
+}
+
+function getWishlistFormDefaults() {
   const noteInput = document.getElementById('wishlistNoteInput');
   const tags = Array.from(document.querySelectorAll('.wishlist-tag-check:checked')).map(cb => cb.value);
-  const note = noteInput.value.trim();
+  return { tags, note: noteInput?.value.trim() || '' };
+}
 
-  await fetch('/api/wishlist', {
+function catalogBookPayload(book, defaults) {
+  return {
+    title: book.title,
+    tags: defaults.tags,
+    note: defaults.note,
+    bookId: book.bookId,
+    author: book.author,
+    imprint: book.imprint,
+    dataType: book.dataType,
+    holdings: book.holdings,
+    available: book.available,
+    reservable: book.reservable,
+    waitingCount: book.waitingCount,
+  };
+}
+
+function mergeWishlistItems(items) {
+  for (const item of items || []) {
+    const existing = currentWishlist.find(w => w.title === item.title);
+    if (existing) Object.assign(existing, item);
+    else currentWishlist.push(item);
+  }
+}
+
+async function addFromCatalog(row) {
+  const book = JSON.parse(row.dataset.book);
+  await addCatalogBook(book);
+}
+
+async function addCatalogBookById(bookId) {
+  const book = catalogSearchResults.find(r => r.bookId === bookId);
+  if (!book) return;
+  await addCatalogBook(book);
+}
+
+async function addCatalogBook(book) {
+  const defaults = getWishlistFormDefaults();
+  const payload = catalogBookPayload(book, defaults);
+
+  const res = await fetch('/api/wishlist', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title: book.title, tags, note,
-      bookId: book.bookId,
-      holdings: book.holdings,
-      reservable: book.reservable,
-      waitingCount: book.waitingCount,
-    }),
+    body: JSON.stringify(payload),
   });
+  const result = await res.json();
+  if (result.error) throw new Error(result.error);
 
-  // Update local state
-  const existing = currentWishlist.find(w => w.title === book.title);
-  if (existing) {
-    for (const t of tags) { if (!existing.tags.includes(t)) existing.tags.push(t); }
-    if (note) existing.note = note;
-    existing.bookId = book.bookId;
-    existing.holdings = book.holdings;
-    existing.reservable = book.reservable;
-    existing.waitingCount = book.waitingCount;
-  } else {
-    currentWishlist.push({
-      title: book.title, tags, note,
-      bookId: book.bookId, holdings: book.holdings,
-      reservable: book.reservable, waitingCount: book.waitingCount,
-      dateAdded: new Date().toISOString(),
-    });
+  mergeWishlistItems(result.items);
+  catalogSelectedBookIds.delete(book.bookId);
+  clearWishlistAddForm();
+  renderFavoritesPage();
+  renderCatalogSearchResults();
+  showBanner('info', `已加入：${book.title}`);
+}
+
+async function addSelectedCatalogBooks() {
+  const defaults = getWishlistFormDefaults();
+  const books = catalogSearchResults
+    .filter(book => catalogSelectedBookIds.has(book.bookId) && isCatalogItemEligible(book));
+  if (books.length === 0) return;
+
+  const res = await fetch('/api/wishlist/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: books.map(book => catalogBookPayload(book, defaults)) }),
+  });
+  const result = await res.json();
+  if (result.error) {
+    showBanner('error', '加入願望清單失敗：' + result.error);
+    return;
   }
 
-  // Mark row as added
-  row.classList.add('catalog-added');
-  row.querySelector('.add-wish-btn').textContent = '已加入';
-  row.querySelector('.add-wish-btn').disabled = true;
-
-  noteInput.value = '';
-  document.querySelectorAll('.wishlist-tag-check').forEach(cb => cb.checked = false);
+  mergeWishlistItems(result.items);
+  for (const book of books) catalogSelectedBookIds.delete(book.bookId);
+  clearWishlistAddForm();
   renderFavoritesPage();
+  renderCatalogSearchResults();
+  showBanner('info', `已加入 ${result.added} 本，更新 ${result.updated} 本`);
+}
+
+function clearWishlistAddForm() {
+  const noteInput = document.getElementById('wishlistNoteInput');
+  if (noteInput) noteInput.value = '';
+  document.querySelectorAll('.wishlist-tag-check').forEach(cb => cb.checked = false);
 }
 
 async function reserveBook(bookId, title, btn) {

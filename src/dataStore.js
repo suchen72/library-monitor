@@ -8,6 +8,7 @@ const FAVORITES_PATH = path.join(ROOT, 'data', 'favorites.json');
 const HISTORY_PATH = path.join(ROOT, 'data', 'history.json');
 const WISHLIST_PATH = path.join(ROOT, 'data', 'wishlist.json');
 const SESSIONS_DIR = path.join(ROOT, 'sessions');
+const DEFAULT_WISHLIST_TAG = '可可貝貝';
 
 function readAccounts() {
   const accounts = [];
@@ -212,12 +213,84 @@ async function readHistoryFromKV() {
 
 function readWishlist() {
   if (!fs.existsSync(WISHLIST_PATH)) {
-    return { tags: ['可可貝貝', '包包', '大人'], wishlist: [] };
+    return { tags: [DEFAULT_WISHLIST_TAG, '包包', '大人'], wishlist: [] };
   }
   const data = JSON.parse(fs.readFileSync(WISHLIST_PATH, 'utf8'));
-  if (!data.tags) data.tags = ['可可貝貝', '包包', '大人'];
+  if (!data.tags) data.tags = [DEFAULT_WISHLIST_TAG, '包包', '大人'];
   if (!Array.isArray(data.wishlist)) data.wishlist = [];
   return data;
+}
+
+function normalizeWishlistTags(tags) {
+  const cleaned = Array.isArray(tags)
+    ? tags.map(t => String(t || '').trim()).filter(Boolean)
+    : [];
+  return cleaned.length > 0 ? [...new Set(cleaned)] : [DEFAULT_WISHLIST_TAG];
+}
+
+function repairWishlistTags(data) {
+  let changed = false;
+  if (!Array.isArray(data.wishlist)) data.wishlist = [];
+  for (const item of data.wishlist) {
+    const nextTags = normalizeWishlistTags(item.tags);
+    if (!Array.isArray(item.tags) || item.tags.length !== nextTags.length || item.tags.some((t, i) => t !== nextTags[i])) {
+      item.tags = nextTags;
+      changed = true;
+    }
+  }
+  return { data, changed };
+}
+
+function copyWishlistCatalogFields(target, source) {
+  const fields = [
+    'bookId', 'author', 'imprint', 'dataType',
+    'holdings', 'available', 'reservable', 'waitingCount',
+  ];
+  for (const field of fields) {
+    if (source[field] !== undefined && source[field] !== null && source[field] !== '') {
+      target[field] = source[field];
+    }
+  }
+}
+
+function addOrUpdateWishlistItems(data, items, now = new Date()) {
+  if (!Array.isArray(data.wishlist)) data.wishlist = [];
+  const sourceItems = Array.isArray(items) ? items : [items];
+  const result = { added: 0, updated: 0, skipped: 0, items: [] };
+
+  for (const item of sourceItems) {
+    const title = String(item?.title || '').trim();
+    if (!title) {
+      result.skipped++;
+      continue;
+    }
+
+    const tags = normalizeWishlistTags(item.tags);
+    const existing = data.wishlist.find(w => w.title === title);
+    if (existing) {
+      existing.tags = normalizeWishlistTags(existing.tags);
+      for (const tag of tags) {
+        if (!existing.tags.includes(tag)) existing.tags.push(tag);
+      }
+      if (item.note !== undefined) existing.note = item.note || '';
+      copyWishlistCatalogFields(existing, item);
+      result.updated++;
+      result.items.push(existing);
+    } else {
+      const entry = {
+        title,
+        tags,
+        note: item.note || '',
+        dateAdded: now.toISOString(),
+      };
+      copyWishlistCatalogFields(entry, item);
+      data.wishlist.push(entry);
+      result.added++;
+      result.items.push(entry);
+    }
+  }
+
+  return result;
 }
 
 function writeWishlist(data) {
@@ -345,6 +418,7 @@ module.exports = {
   readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
   readHistory, writeHistory, pushHistoryToKV, readHistoryFromKV,
   readWishlist, writeWishlist, pushWishlistToKV, readWishlistFromKV,
+  DEFAULT_WISHLIST_TAG, normalizeWishlistTags, repairWishlistTags, addOrUpdateWishlistItems,
   buildOwnedTitleSet,
   annotateFirstSeen, computeHistoryDiff,
 };
