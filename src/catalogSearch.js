@@ -78,6 +78,8 @@ async function searchCatalog(keyword, maxResults = 10) {
         op: [],
         keepsite: [],
         cln: [],
+        pageNo: 1,
+        limit: Math.max(maxResults, 100),
         queryString: `searchField=TI&searchInput=${encodeURIComponent(keyword)}`,
       },
     },
@@ -108,6 +110,9 @@ async function searchCatalog(keyword, maxResults = 10) {
     results.push({
       title: kv.title,
       bookId: kv.sid,
+      author: kv.author || '',
+      imprint: kv.imprint || '',
+      dataType: kv.feaName || '', // common:webpac.dataType.book = 圖書, .eresource = 電子資源
       holdings: parseInt(kv.holdNum, 10) || 0,
       available: parseInt(kv.onShelveNum, 10) || 0,
       reservable: parseInt(kv.allowBookingNum, 10) || 0,

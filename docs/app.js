@@ -3,6 +3,11 @@ let currentTags = ['可可貝貝', '包包', '大人'];
 let favFilterTag = null; // null = show all
 let currentWishlist = [];
 let wishlistFilterTag = null; // null = show all (shared concept, but wishlist has its own)
+let wishlistHideOwned = false;
+let wishlistSort = { key: 'dateAdded', dir: 'desc' };
+let wishlistExpanded = false;
+const WISHLIST_COLLAPSED_LIMIT = 10;
+let loanAccountFilter = null; // null = show all; otherwise account id
 let ownedTitleSet = new Set();
 let currentHistory = [];
 let historySearch = '';
@@ -133,9 +138,13 @@ function renderFavoritesPage() {
   const filteredFav = favFilterTag
     ? currentFavorites.filter(f => f.tags.includes(favFilterTag))
     : currentFavorites;
-  const filteredWish = favFilterTag
+  let filteredWish = favFilterTag
     ? currentWishlist.filter(w => w.tags.includes(favFilterTag))
-    : currentWishlist;
+    : currentWishlist.slice();
+  if (wishlistHideOwned) {
+    filteredWish = filteredWish.filter(w => !ownedTitleSet.has(w.title));
+  }
+  filteredWish.sort((a, b) => compareWishlist(a, b, wishlistSort));
 
   // Shared filter buttons
   let filterHtml = '<div class="fav-filters">';
@@ -206,7 +215,10 @@ function renderFavoritesPage() {
   if (filteredWish.length === 0) {
     wishHtml = '<div class="section"><div class="section-title">願望清單</div><div class="card-body" style="text-align:center;color:#a0aec0;padding:40px">還沒有想借的書</div></div>';
   } else {
-    const wishRows = filteredWish.map(w => {
+    const totalWish = filteredWish.length;
+    const isCollapsed = !wishlistExpanded && totalWish > WISHLIST_COLLAPSED_LIMIT;
+    const visibleWish = isCollapsed ? filteredWish.slice(0, WISHLIST_COLLAPSED_LIMIT) : filteredWish;
+    const wishRows = visibleWish.map(w => {
       const tagBadges = (w.tags || []).map(t => {
         const tc = TAG_COLORS[t] || { color: '#718096', label: t[0] };
         return `<span class="tag-badge" style="background:${tc.color}">${escHtml(t)}</span>`;
@@ -230,25 +242,74 @@ function renderFavoritesPage() {
         <td>${tagBadges}</td>
         <td>${holdingsInfo}</td>
         <td>${owned}</td>
+        <td>${formatDateTime(w.dateAdded)}</td>
         <td>${reserveBtn} <button class="remove-btn" onclick="removeWishlistItem('${escHtml(w.title)}')">刪除</button></td>
       </tr>`;
     }).join('');
+    const sh = (label, key) => sortHeader(label, key, wishlistSort);
+    const ownedToggle = `<label class="wish-toggle"><input type="checkbox" ${wishlistHideOwned ? 'checked' : ''} onchange="toggleWishlistHideOwned()"> 只看沒借過</label>`;
+    const expandBtn = totalWish > WISHLIST_COLLAPSED_LIMIT
+      ? `<div class="wish-expand-wrap"><button class="wish-expand-btn" onclick="toggleWishlistExpanded()">${isCollapsed ? `顯示全部 ${totalWish} 本` : '收起，只看前 ' + WISHLIST_COLLAPSED_LIMIT + ' 本'}</button></div>`
+      : '';
     wishHtml = `<div class="section">
-      <div class="section-title">願望清單（共 ${filteredWish.length} 本）</div>
+      <div class="section-title">願望清單（共 ${totalWish} 本${isCollapsed ? `，顯示前 ${WISHLIST_COLLAPSED_LIMIT}` : ''}）${ownedToggle}</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>書名</th><th>備註</th><th>標籤</th><th>館藏/可預約/等待</th><th>狀態</th><th>操作</th></tr></thead>
+          <thead><tr><th>${sh('書名','title')}</th><th>${sh('備註','note')}</th><th>標籤</th><th>${sh('館藏','holdings')}/${sh('可預約','reservable')}/${sh('等待','waitingCount')}</th><th>狀態</th><th>${sh('加入日期','dateAdded')}</th><th>操作</th></tr></thead>
           <tbody>${wishRows}</tbody>
         </table>
       </div>
+      ${expandBtn}
     </div>`;
   }
 
-  document.getElementById('favoritesContent').innerHTML = filterHtml + favHtml + addFormHtml + quotaHtml + wishHtml;
+  document.getElementById('favoritesContent').innerHTML = filterHtml + addFormHtml + quotaHtml + wishHtml + favHtml;
 }
 
 function setFavFilter(tag) {
   favFilterTag = tag;
+  renderFavoritesPage();
+}
+
+function sortHeader(label, key, sort) {
+  const arrow = sort.key === key ? (sort.dir === 'desc' ? ' ▼' : ' ▲') : '';
+  return `<span class="sort-header${sort.key === key ? ' active' : ''}" onclick="setWishlistSort('${key}')">${label}${arrow}</span>`;
+}
+
+function compareWishlist(a, b, sort) {
+  const av = a[sort.key], bv = b[sort.key];
+  const numericKeys = ['holdings', 'reservable', 'waitingCount'];
+  let cmp;
+  if (numericKeys.includes(sort.key)) {
+    cmp = (av ?? -Infinity) - (bv ?? -Infinity);
+  } else {
+    cmp = (av || '').toString().localeCompare((bv || '').toString());
+  }
+  return sort.dir === 'desc' ? -cmp : cmp;
+}
+
+const SORT_DEFAULT_DIR = {
+  title: 'asc', note: 'asc',
+  holdings: 'desc', reservable: 'desc', waitingCount: 'asc',
+  dateAdded: 'desc',
+};
+
+function setWishlistSort(key) {
+  if (wishlistSort.key === key) {
+    wishlistSort = { key, dir: wishlistSort.dir === 'desc' ? 'asc' : 'desc' };
+  } else {
+    wishlistSort = { key, dir: SORT_DEFAULT_DIR[key] || 'asc' };
+  }
+  renderFavoritesPage();
+}
+
+function toggleWishlistHideOwned() {
+  wishlistHideOwned = !wishlistHideOwned;
+  renderFavoritesPage();
+}
+
+function toggleWishlistExpanded() {
+  wishlistExpanded = !wishlistExpanded;
   renderFavoritesPage();
 }
 
@@ -597,10 +658,20 @@ function renderDashboard(data) {
     (a.reservations || []).map(r => ({ ...r, accountId: a.id, accountLabel: a.label || a.id }))
   );
 
+  if (loanAccountFilter && !accounts.some(a => a.id === loanAccountFilter)) {
+    loanAccountFilter = null;
+  }
+  const filteredBorrowed = loanAccountFilter
+    ? allBorrowed.filter(b => b.accountId === loanAccountFilter)
+    : allBorrowed;
+  const filteredReservations = loanAccountFilter
+    ? allReservations.filter(r => r.accountId === loanAccountFilter)
+    : allReservations;
+
   const readyReservations = allReservations.filter(r => r.isReady);
 
   // Sort: 待領(0) > 調撥中(1) > 排隊(2), then by account label
-  const sortedReservations = [...allReservations].sort((a, b) => {
+  const sortedReservations = [...filteredReservations].sort((a, b) => {
     const priority = (r) => r.isReady ? 0 : r.isInTransit ? 1 : 2;
     const pa = priority(a), pb = priority(b);
     if (pa !== pb) return pa - pb;
@@ -615,21 +686,29 @@ function renderDashboard(data) {
   document.getElementById('content').innerHTML =
     renderAccountSummary(accounts) +
     renderReadyBanner(readyReservations) +
-    renderBorrowedTable(allBorrowed) +
+    renderBorrowedTable(filteredBorrowed) +
     renderReservationsTable(sortedReservations);
+}
+
+function setLoanAccountFilter(accountId) {
+  loanAccountFilter = (loanAccountFilter === accountId) ? null : accountId;
+  if (currentData) renderDashboard(currentData);
 }
 
 // --- Account summary bar ---
 function renderAccountSummary(accounts) {
+  const allActive = loanAccountFilter === null ? ' active' : '';
+  const allBadge = `<span class="account-badge filter-badge${allActive}" onclick="setLoanAccountFilter(null)">全部</span>`;
   const badges = accounts.map(a => {
     const cls = { ok: 'status-ok', error: 'status-error' }[a.status] || 'status-ok';
     const label = { ok: '正常', error: '錯誤' }[a.status] || a.status;
-    return `<span class="account-badge">
+    const active = loanAccountFilter === a.id ? ' active' : '';
+    return `<span class="account-badge filter-badge${active}" onclick="setLoanAccountFilter('${escHtml(a.id)}')">
       ${escHtml(a.label || a.id)}
       <span class="status-badge ${cls}">${label}</span>
     </span>`;
   }).join('');
-  return `<div class="account-summary">${badges}</div>`;
+  return `<div class="account-summary">${allBadge}${badges}</div>`;
 }
 
 // --- Ready pickup alert banner ---

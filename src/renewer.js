@@ -49,25 +49,41 @@ async function renewByAccount(accountId, titles) {
           continue;
         }
 
-        // Click renew
+        // Click renew — opens a confirmation modal ("確定要續借？")
         await renewBtn.click();
-        await page.waitForTimeout(3000);
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await page.waitForTimeout(1500);
 
-        // Check result
-        const bodyText = await page.textContent('body');
-        const success = bodyText.includes('續借成功');
-        results.push({
-          title,
-          success,
-          message: success ? '續借成功' : '續借失敗或無法判斷',
-        });
+        // The confirm button is <input type="button" value="確定"> — value attr, not textContent
+        const confirmBtn = page.locator('input[type="button"][value="確定"]').first();
+        const hasConfirm = await confirmBtn.isVisible().catch(() => false);
 
-        // Close modal if present
-        const closeBtn = page.locator('.lightbox .close, .modal .close, [class*="close"]').first();
-        if (await closeBtn.isVisible().catch(() => false)) {
-          await closeBtn.click().catch(() => {});
-          await page.waitForTimeout(1000);
+        if (!hasConfirm) {
+          results.push({ title, success: false, message: '找不到確認續借按鈕' });
+        } else {
+          // Confirm triggers a GraphQL mutation `doContuineBook`. Listen for its response —
+          // page text is unreliable (i18n templates contain "續借成功" / "失敗" verbatim).
+          const renewRespPromise = page.waitForResponse(
+            resp => resp.url().includes('/api/HyLibWS/graphql')
+              && (resp.request().postData() || '').includes('doContuineBook'),
+            { timeout: 15000 }
+          ).catch(() => null);
+
+          await confirmBtn.click();
+          const renewResp = await renewRespPromise;
+
+          let success = false;
+          let message = '無法判斷續借結果';
+          if (renewResp) {
+            const json = await renewResp.json().catch(() => null);
+            const r = json?.data?.doContuineBook;
+            if (r) {
+              success = !!r.success;
+              message = success ? '續借成功' : (r.message || '續借失敗');
+            }
+          }
+          results.push({ title, success, message });
+
+          await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         }
 
         // Re-navigate for next book (modal may have changed DOM)
