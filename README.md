@@ -13,6 +13,8 @@
   - 預約書領取截止日 2 天內
 - **Session 持久化** — 登入後儲存 session，避免每次都需要輸入驗證碼
 - **即時進度** — 透過 SSE 在儀表板上顯示更新進度
+- **願望清單** — 支援多標籤、館藏搜尋、館藏/可預約/等待數排序、已借過篩選與直接預約
+- **書單審核匯入** — 從 `data/booklist.csv` 產生人工審核用 CSV，再只匯入核准列到願望清單
 
 ## 技術架構
 
@@ -85,6 +87,44 @@ npm run dev
 
 開啟 http://localhost:3000 即可使用儀表板。
 
+## 願望清單書單審核
+
+用 `data/booklist.csv` 批次建立願望清單前，先產生人工審核檔：
+
+```bash
+node src/generateWishlistReview.js 300
+```
+
+這會寫出 `data/wishlist-review.csv`。審核時在 `reviewDecision` 欄填入：
+
+- `add`：匯入該列。
+- 空白或 `skip`：不匯入。
+
+匯入審核通過的列：
+
+```bash
+node src/importWishlistReview.js
+```
+
+匯入腳本只接受 `matchStatus=matched` 且 `dataType=common:webpac.dataType.book` 的列，並會加入 `包包`、`閱讀小博士` 標籤。若網站讀取 Cloudflare KV，匯入後需同步遠端願望清單：
+
+```bash
+node -e "const {readWishlist,pushWishlistToKV}=require('./src/dataStore'); pushWishlistToKV(readWishlist()).then(()=>console.log('wishlist KV sync done')).catch(err=>{ console.error(err.message); process.exit(1); });"
+```
+
+## Feature Log
+
+- 2026-05-05: 完成 `booklist.csv` → `wishlist-review.csv` → wishlist 的人工審核匯入流程。產生器會排除非圖書資料型別，標記短書名/非完全同名等需要人工確認的列；匯入器會保留館藏欄位並合併既有願望清單標籤。
+- 2026-05-05: 已將審核後的 `add` 列同步到 Cloudflare KV。遠端願望清單共 441 筆，其中 225 筆帶 `閱讀小博士` 標籤。
+
+## Roadmap
+
+- 將審核匯入流程接到 UI：上傳 `booklist.csv`、預覽候選、人工核准、匯入與同步 KV 不再依賴命令列。
+- 匯入後自動同步 Cloudflare KV，並在失敗時顯示可重試的錯誤。
+- 讓願望清單篩選標籤直接合併 favorites 與 wishlist 的 tags，避免 wishlist-only tag 沒有篩選按鈕。
+- 強化審核列的去重與已擁有狀態檢查：願望清單、目前借閱、預約清單與借閱史都應回寫到 `reviewNote`。
+- 針對短書名與多版本候選提供更清楚的版本/作者比較，降低人工確認成本。
+
 ### 首次登入
 
 首次使用或 session 過期時，系統會開啟可見的瀏覽器視窗，帳號密碼會自動填入，你只需要：
@@ -119,8 +159,10 @@ library-monitor/
 │   ├── server.js       # Express 伺服器 + SSE + 排程
 │   ├── scraper.js      # Playwright 登入 + 資料抓取
 │   ├── dataStore.js    # 帳號讀取 + JSON 資料存取
+│   ├── generateWishlistReview.js # 書單審核 CSV 產生器
+│   ├── importWishlistReview.js   # 審核後願望清單匯入器
 │   └── notifier.js     # Email 通知邏輯
-├── public/
+├── docs/
 │   ├── index.html      # 儀表板頁面
 │   ├── style.css       # 樣式
 │   └── app.js          # 前端邏輯 + SSE

@@ -4,9 +4,8 @@ node_modules/
 sessions/
 logs/
 eng.traineddata
-data/library-data.json
-data/notified.json
-data/favorites.json
+data/
+scripts/
 worker/wrangler.toml
 launchd/
 .claude/
