@@ -47,7 +47,7 @@ app.post('/api/refresh', (req, res) => {
     return res.json({ status: 'already-refreshing' });
   }
   res.json({ status: 'started' });
-  triggerRefresh();
+  triggerRefresh({ notify: false });
 });
 
 // --- API: SSE stream for refresh progress ---
@@ -215,6 +215,9 @@ app.post('/api/renew', async (req, res) => {
   renewBook(accountId, title).then(result => {
     console.log(`[renew] ${result.message}`);
     events.emit('scrape', { type: 'renew-result', ...result, title, accountId });
+    if (result.success) {
+      refreshAfterMutation('renew');
+    }
   }).catch(err => {
     console.error(`[renew] Error:`, err.message);
     events.emit('scrape', { type: 'renew-result', success: false, message: err.message, title, accountId });
@@ -253,6 +256,9 @@ app.post('/api/renew-all', async (req, res) => {
       events.emit('scrape', { type: 'renew-result', ...r, accountId });
     }
     events.emit('scrape', { type: 'renew-all-done', accountId, results });
+    if (results.some(r => r.success)) {
+      refreshAfterMutation('renew-all');
+    }
   }).catch(err => {
     console.error(`[renew-all] Error:`, err.message);
     events.emit('scrape', { type: 'renew-all-done', accountId, results: [{ success: false, message: err.message }] });
@@ -270,6 +276,9 @@ app.post('/api/reserve', async (req, res) => {
     const result = await reserveBook(accountId, bookId);
     console.log(`[reserve] ${result.message}`);
     res.json(result);
+    if (result.success) {
+      refreshAfterMutation('reserve');
+    }
   } catch (err) {
     console.error(`[reserve] Error:`, err.message);
     res.status(500).json({ success: false, message: err.message });
@@ -298,7 +307,10 @@ app.delete('/api/favorites', async (req, res) => {
 });
 
 // --- Refresh logic ---
-async function triggerRefresh() {
+async function triggerRefresh({
+  notify = true,
+  notificationChannels = { line: true, email: true },
+} = {}) {
   if (isRefreshing) return;
   isRefreshing = true;
   console.log(`[${new Date().toISOString()}] Starting refresh...`);
@@ -310,11 +322,13 @@ async function triggerRefresh() {
     });
     console.log(`[${new Date().toISOString()}] Refresh complete.`);
 
-    // Check for alerts and send email notifications
+    // Push refreshed data to KV; scheduled refreshes also send notifications.
     const latestData = readData();
     await pushToKV(latestData);
     await pushHistoryToKV(readHistory());
-    await notifyDaily(latestData);
+    if (notify) {
+      await notifyDaily(latestData, notificationChannels);
+    }
   } catch (err) {
     console.error('Refresh failed:', err.message);
     events.emit('scrape', { type: 'error-fatal', message: err.message });
@@ -323,14 +337,25 @@ async function triggerRefresh() {
   }
 }
 
-// --- Daily cron: 00:00 every day (Taipei time) ---
-cron.schedule('0 0 * * *', () => {
+function refreshAfterMutation(label) {
+  triggerRefresh({ notify: false }).catch(err => {
+    console.error(`[${label}] Refresh after mutation failed:`, err.message);
+  });
+}
+
+// --- Daily cron: 10:00 every day (Taipei time) ---
+cron.schedule('0 10 * * *', () => {
   console.log('[cron] Daily refresh triggered');
-  triggerRefresh();
+  triggerRefresh({
+    notify: true,
+    notificationChannels: { line: true, email: true },
+  });
+}, {
+  timezone: 'Asia/Taipei',
 });
 
 // --- Start server ---
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`圖書館儀表板已啟動: http://localhost:${PORT}`);
-  console.log('每天 00:00 自動更新，或點擊儀表板上的「立即更新」手動觸發');
+  console.log('每天 10:00 自動更新，或點擊儀表板上的「立即更新」手動觸發');
 });

@@ -2,14 +2,18 @@ name: Library Scrape & Notify
 
 on:
   schedule:
-    # 00:00 Taiwan time (UTC+8) = 16:00 UTC
-    - cron: '0 16 * * *'
+    # 10:00 Taiwan time (UTC+8) = 02:00 UTC
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       mode:
         description: 'Notification mode: daily, summary, borrowed, reservations, return, hours, renew'
         required: false
         default: 'daily'
+      source:
+        description: 'Execution source: manual or line'
+        required: false
+        default: 'manual'
 
 concurrency:
   group: scrape
@@ -46,6 +50,7 @@ jobs:
         env:
           TZ: Asia/Taipei
           MODE: ${{ github.event.inputs.mode || 'daily' }}
+          SOURCE: ${{ github.event_name == 'schedule' && 'schedule' || github.event.inputs.source || 'manual' }}
           ACCOUNT1_LABEL: ${{ secrets.ACCOUNT1_LABEL }}
           ACCOUNT1_CARD: ${{ secrets.ACCOUNT1_CARD }}
           ACCOUNT1_PASSWORD: ${{ secrets.ACCOUNT1_PASSWORD }}

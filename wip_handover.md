@@ -1,14 +1,27 @@
-# WIP Handover: Wishlist Review Closeout
+# WIP Handover: Notification Routing and Wishlist Review Closeout
 
 ## Current Objective
 
-- Close out the CSV booklist wishlist review work.
+- Close out notification routing and CSV booklist wishlist review docs.
 - Keep roadmap details in README.
 - Update feature log and WIP handover.
 - Commit and push the completed cleanup.
 
 ## Completed Progress
 
+- Updated notification routing.
+  - Daily automatic refresh now runs at 10:00 Taiwan time in GitHub Actions and local `node-cron`.
+  - Daily automatic refresh sends both LINE push and Email regardless of alert count.
+  - Browser-triggered refresh writes refreshed data to Cloudflare KV but does not send LINE push or Email.
+  - LINE-triggered GitHub Actions runs are marked with `source=line`, write refreshed data to Cloudflare KV, and report only to LINE.
+  - Manual GitHub workflow runs default to `source=manual`, report to LINE only, and do not send Email.
+- Split notification channels in `src/notifier.js`.
+  - Notification helpers now accept `{ line, email }` channels.
+  - Email is only enabled for `source=schedule` / scheduled server cron paths.
+- Synced account state after mutations.
+  - Browser single-book renew, bulk renew, and reservation success now start a non-notifying refresh to update Cloudflare KV.
+  - LINE/GitHub renew success now re-scrapes and syncs Cloudflare KV before reporting the renew result.
+  - Daily auto-renew success re-scrapes and uses fresh data for the daily notification.
 - Added `src/generateWishlistReview.js`.
   - Reads `data/booklist.csv`.
   - Searches catalog by title variants only.
@@ -27,10 +40,12 @@
   - Items tagged `閱讀小博士`: 225.
   - Sample verified item: `動物絕對不應該穿衣服`.
 - Added `閱讀小博士` to favorites tags and synced tags to Cloudflare KV so the UI can show the filter.
-- Updated README with wishlist review usage, feature log, and roadmap.
+- Updated README with wishlist review usage, notification behavior, feature log, and roadmap.
 
 ## Validation
 
+- `npm test`
+  - 72 tests passed.
 - `node src/importWishlistReview.js`
   - `importedRows`: 227
   - `skippedAddRows`: 0
@@ -38,6 +53,24 @@
   - `updated`: 227
   - `skipped`: 0
 - Cloudflare KV readback confirmed the synced wishlist contains 225 `閱讀小博士` items.
+
+## Notification Rules
+
+- Daily automatic refresh at 10:00 Taiwan time:
+  - Scrape account data.
+  - Push library data and history to Cloudflare KV.
+  - Send LINE push and Email, even when there are no alerts.
+- Browser actions:
+  - Browser refresh scrapes and writes KV, then displays status only in the browser.
+  - Browser renew/reserve results display only in the browser.
+  - Successful browser renew/reserve starts a non-notifying refresh to sync KV.
+- LINE actions:
+  - LINE refresh/daily/renew actions display only in LINE.
+  - LINE-triggered refresh and successful renew flows still update KV.
+  - LINE actions do not send Email.
+- Manual GitHub workflow runs:
+  - Default to LINE-only notification.
+  - Do not send Email.
 
 ## Confirmed Rules
 

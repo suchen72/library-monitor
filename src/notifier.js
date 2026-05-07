@@ -369,41 +369,47 @@ function buildClosureStatus() {
 
 // --- Dispatch functions ---
 
-async function notify(message, subject, label) {
-  await sendLine(message, label);
-  await trySendEmail(subject, message, label);
+const LINE_ONLY = { line: true, email: false };
+
+async function notify(message, subject, label, channels = LINE_ONLY) {
+  if (channels.line) {
+    await sendLine(message, label);
+  }
+  if (channels.email) {
+    await trySendEmail(subject, message, label);
+  }
 }
 
-async function notifyDaily(data) {
+async function notifyDaily(data, channels = LINE_ONLY) {
   const alerts = buildAlerts(data);
 
   if (alerts.length > 0) {
     const message = formatAlertMessage(alerts);
-    await notify(message, `圖書館提醒：${alerts.length} 項待處理事項`, 'daily');
+    await notify(message, `圖書館提醒：${alerts.length} 項待處理事項`, 'daily', channels);
   } else {
     const message = `📚 每日檢查完成\n\n${getTodayStatusLine()}\n\n✅ 今天沒有需要通知的事項`;
-    await notify(message, '圖書館每日檢查：無待處理事項', 'daily');
+    await notify(message, '圖書館每日檢查：無待處理事項', 'daily', channels);
   }
 }
 
-async function notifySummary(data) {
-  await notify(buildSummary(data), '圖書館借閱總覽', 'summary');
+async function notifySummary(data, channels = LINE_ONLY) {
+  await notify(buildSummary(data), '圖書館借閱總覽', 'summary', channels);
 }
 
-async function notifyBorrowed(data) {
-  await notify(buildBorrowedSoon(data), '圖書館：近期到期書籍', 'borrowed');
+async function notifyBorrowed(data, channels = LINE_ONLY) {
+  await notify(buildBorrowedSoon(data), '圖書館：近期到期書籍', 'borrowed', channels);
 }
 
-async function notifyReservations(data) {
-  await notify(buildReservations(data), '圖書館：預約書狀態', 'reservations');
+async function notifyReservations(data, channels = LINE_ONLY) {
+  await notify(buildReservations(data), '圖書館：預約書狀態', 'reservations', channels);
 }
 
-async function notifyReturn(data) {
-  await notify(buildReturnAdvice(data), '圖書館：還書建議', 'return');
+async function notifyReturn(data, channels = LINE_ONLY) {
+  await notify(buildReturnAdvice(data), '圖書館：還書建議', 'return', channels);
 }
 
-async function notifyClosureStatus() {
-  await notify(buildClosureStatus(), '圖書館：開館資訊', 'hours');
+async function notifyClosureStatus(channels = LINE_ONLY) {
+  await notify(buildClosureStatus(), '圖書館：開館資訊', 'hours', channels);
 }
 
 // --- Auto-renew targets (for daily mode) ---
@@ -423,7 +429,7 @@ function getAutoRenewTargets(data) {
   return targets;
 }
 
-async function notifyAutoRenew(results) {
+async function notifyAutoRenew(results, channels = LINE_ONLY) {
   const succeeded = results.filter(r => r.success);
   const failed = results.filter(r => !r.success && r.message !== '不可續借');
 
@@ -449,10 +455,10 @@ async function notifyAutoRenew(results) {
     message += '沒有需要自動續借的書';
   }
 
-  await notify(message, '圖書館：自動續借結果', 'auto-renew');
+  await notify(message, '圖書館：自動續借結果', 'auto-renew', channels);
 }
 
-async function notifyRenew(results) {
+async function notifyRenew(results, channels = LINE_ONLY) {
   const succeeded = results.filter(r => r.success);
   const failed = results.filter(r => !r.success && r.message !== '不可續借');
   const skipped = results.filter(r => r.message === '不可續借');
@@ -483,7 +489,7 @@ async function notifyRenew(results) {
     message += '目前沒有需要續借的書';
   }
 
-  await notify(message, '圖書館：續借結果', 'renew');
+  await notify(message, '圖書館：續借結果', 'renew', channels);
 }
 
 async function sendLine(message, label) {

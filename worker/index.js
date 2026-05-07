@@ -109,7 +109,7 @@ export default {
             },
             body: JSON.stringify({
               ref: 'main',
-              inputs: { mode: ghMode },
+              inputs: { mode: ghMode, source: 'line' },
             }),
           }
         );

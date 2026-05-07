@@ -13,58 +13,74 @@ const { renewAll, autoRenew } = require('./renewer');
 const captchaSolver = require('./captchaSolver');
 
 const mode = process.env.MODE || 'daily';
+const source = process.env.SOURCE || 'manual';
+const notificationChannels = source === 'schedule'
+  ? { line: true, email: true }
+  : { line: true, email: false };
+const lineOnlyChannels = { line: true, email: false };
 
 // Ensure required directories exist
 fs.mkdirSync(path.join(__dirname, '..', 'sessions'), { recursive: true });
 fs.mkdirSync(path.join(__dirname, '..', 'data'), { recursive: true });
 
+async function scrapeAndSync() {
+  await scrapeAll((event) => {
+    console.log('[scrape]', event.type, event.label || '');
+  });
+
+  const data = readData();
+  await pushToKV(data);
+  await pushHistoryToKV(readHistory());
+  return data;
+}
+
 (async () => {
-  console.log(`[run] Starting (mode=${mode}) at ${new Date().toISOString()}`);
+  console.log(`[run] Starting (mode=${mode}, source=${source}) at ${new Date().toISOString()}`);
 
   try {
     // Renew mode: skip scrape, just renew all and notify
     if (mode === 'renew') {
       const { results } = await renewAll();
-      await notifyRenew(results);
+      if (results.some(r => r.success)) {
+        await scrapeAndSync();
+      }
+      await notifyRenew(results, notificationChannels);
       console.log('[run] Done (renew)');
       return;
     }
 
-    await scrapeAll((event) => {
-      console.log('[scrape]', event.type, event.label || '');
-    });
-
-    const data = readData();
-    await pushToKV(data);
-    await pushHistoryToKV(readHistory());
+    let data = await scrapeAndSync();
 
     // Auto-renew books due today (daily mode only)
     if (mode === 'daily') {
       const { results } = await autoRenew(data);
       if (results.length > 0) {
-        await notifyAutoRenew(results);
+        await notifyAutoRenew(results, lineOnlyChannels);
+      }
+      if (results.some(r => r.success)) {
+        data = await scrapeAndSync();
       }
     }
 
     switch (mode) {
       case 'summary':
-        await notifySummary(data);
+        await notifySummary(data, notificationChannels);
         break;
       case 'borrowed':
-        await notifyBorrowed(data);
+        await notifyBorrowed(data, notificationChannels);
         break;
       case 'reservations':
-        await notifyReservations(data);
+        await notifyReservations(data, notificationChannels);
         break;
       case 'return':
-        await notifyReturn(data);
+        await notifyReturn(data, notificationChannels);
         break;
       case 'hours':
-        await notifyClosureStatus();
+        await notifyClosureStatus(notificationChannels);
         break;
       case 'daily':
       default:
-        await notifyDaily(data);
+        await notifyDaily(data, notificationChannels);
         break;
     }
 
