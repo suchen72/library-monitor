@@ -2,8 +2,8 @@ name: Library Scrape & Notify
 
 on:
   schedule:
-    # 10:00 Taiwan time (UTC+8) = 02:00 UTC
-    - cron: '0 2 * * *'
+    # 10:17 Taiwan time (UTC+8) = 02:17 UTC
+    - cron: '17 2 * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -60,6 +60,27 @@ jobs:
           ACCOUNT3_LABEL: ${{ secrets.ACCOUNT3_LABEL }}
           ACCOUNT3_CARD: ${{ secrets.ACCOUNT3_CARD }}
           ACCOUNT3_PASSWORD: ${{ secrets.ACCOUNT3_PASSWORD }}
+          ACCOUNT4_LABEL: ${{ secrets.ACCOUNT4_LABEL }}
+          ACCOUNT4_CARD: ${{ secrets.ACCOUNT4_CARD }}
+          ACCOUNT4_PASSWORD: ${{ secrets.ACCOUNT4_PASSWORD }}
+          ACCOUNT5_LABEL: ${{ secrets.ACCOUNT5_LABEL }}
+          ACCOUNT5_CARD: ${{ secrets.ACCOUNT5_CARD }}
+          ACCOUNT5_PASSWORD: ${{ secrets.ACCOUNT5_PASSWORD }}
+          ACCOUNT6_LABEL: ${{ secrets.ACCOUNT6_LABEL }}
+          ACCOUNT6_CARD: ${{ secrets.ACCOUNT6_CARD }}
+          ACCOUNT6_PASSWORD: ${{ secrets.ACCOUNT6_PASSWORD }}
+          ACCOUNT7_LABEL: ${{ secrets.ACCOUNT7_LABEL }}
+          ACCOUNT7_CARD: ${{ secrets.ACCOUNT7_CARD }}
+          ACCOUNT7_PASSWORD: ${{ secrets.ACCOUNT7_PASSWORD }}
+          ACCOUNT8_LABEL: ${{ secrets.ACCOUNT8_LABEL }}
+          ACCOUNT8_CARD: ${{ secrets.ACCOUNT8_CARD }}
+          ACCOUNT8_PASSWORD: ${{ secrets.ACCOUNT8_PASSWORD }}
+          ACCOUNT9_LABEL: ${{ secrets.ACCOUNT9_LABEL }}
+          ACCOUNT9_CARD: ${{ secrets.ACCOUNT9_CARD }}
+          ACCOUNT9_PASSWORD: ${{ secrets.ACCOUNT9_PASSWORD }}
+          ACCOUNT10_LABEL: ${{ secrets.ACCOUNT10_LABEL }}
+          ACCOUNT10_CARD: ${{ secrets.ACCOUNT10_CARD }}
+          ACCOUNT10_PASSWORD: ${{ secrets.ACCOUNT10_PASSWORD }}
           EMAIL_ENABLED: ${{ secrets.EMAIL_ENABLED }}
           EMAIL_SENDER: ${{ secrets.EMAIL_SENDER }}
           EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}

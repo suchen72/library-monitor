@@ -4,7 +4,7 @@ const path = require('path');
 const EventEmitter = require('events');
 const { scrapeAll } = require('./scraper');
 const {
-  readData, readFromKV, pushToKV,
+  readAccounts, readData, readFromKV, pushToKV, mergeMissingConfiguredAccounts,
   readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
   readHistory, readHistoryFromKV, pushHistoryToKV,
   readWishlist, writeWishlist, pushWishlistToKV, readWishlistFromKV,
@@ -29,9 +29,15 @@ app.use(express.static(path.join(__dirname, '..', 'docs')));
 // --- API: Get data from KV (single source of truth) ---
 app.get('/api/data', async (req, res) => {
   try {
-    const data = await readFromKV();
-    if (data) {
-      res.json(data);
+    const kvData = await readFromKV();
+    if (kvData) {
+      let configuredAccountIds = [];
+      try {
+        configuredAccountIds = readAccounts().map(a => a.id);
+      } catch {
+        configuredAccountIds = [];
+      }
+      res.json(mergeMissingConfiguredAccounts(kvData, readData(), configuredAccountIds));
     } else {
       // Fallback to local file if KV unavailable
       res.json(readData());
@@ -343,8 +349,8 @@ function refreshAfterMutation(label) {
   });
 }
 
-// --- Daily cron: 10:00 every day (Taipei time) ---
-cron.schedule('0 10 * * *', () => {
+// --- Daily cron: 10:17 every day (Taipei time) ---
+cron.schedule('17 10 * * *', () => {
   console.log('[cron] Daily refresh triggered');
   triggerRefresh({
     notify: true,
@@ -357,5 +363,5 @@ cron.schedule('0 10 * * *', () => {
 // --- Start server ---
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`圖書館儀表板已啟動: http://localhost:${PORT}`);
-  console.log('每天 10:00 自動更新，或點擊儀表板上的「立即更新」手動觸發');
+  console.log('每天 10:17 自動更新，或點擊儀表板上的「立即更新」手動觸發');
 });

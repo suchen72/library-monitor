@@ -10,7 +10,7 @@
 ## Completed Progress
 
 - Updated notification routing.
-  - Daily automatic refresh now runs at 10:00 Taiwan time in GitHub Actions and local `node-cron`.
+  - Daily automatic refresh now runs at 10:17 Taiwan time in GitHub Actions and local `node-cron`.
   - Daily automatic refresh sends both LINE push and Email regardless of alert count.
   - Browser-triggered refresh writes refreshed data to Cloudflare KV but does not send LINE push or Email.
   - LINE-triggered GitHub Actions runs are marked with `source=line`, write refreshed data to Cloudflare KV, and report only to LINE.
@@ -41,6 +41,10 @@
   - Sample verified item: `動物絕對不應該穿衣服`.
 - Added `閱讀小博士` to favorites tags and synced tags to Cloudflare KV so the UI can show the filter.
 - Updated README with wishlist review usage, notification behavior, feature log, and roadmap.
+- Fixed new-account visibility hardening.
+  - GitHub Actions now exposes `ACCOUNT1_*` through `ACCOUNT10_*` secrets to the scraper.
+  - Account loading scans all configured `ACCOUNTn_CARD` variables instead of stopping at the first missing number.
+  - Browser `/api/data` keeps KV as primary data but fills configured accounts that are temporarily missing from KV using local `data/library-data.json`.
 
 ## Validation
 
@@ -56,7 +60,7 @@
 
 ## Notification Rules
 
-- Daily automatic refresh at 10:00 Taiwan time:
+- Daily automatic refresh at 10:17 Taiwan time:
   - Scrape account data.
   - Push library data and history to Cloudflare KV.
   - Send LINE push and Email, even when there are no alerts.

@@ -11,17 +11,23 @@ const SESSIONS_DIR = path.join(ROOT, 'sessions');
 const DEFAULT_WISHLIST_TAG = '可可貝貝';
 
 function readAccounts() {
-  const accounts = [];
-  for (let i = 1; ; i++) {
+  const accountNumbers = Object.keys(process.env)
+    .map(key => key.match(/^ACCOUNT(\d+)_CARD$/))
+    .filter(Boolean)
+    .map(match => Number.parseInt(match[1], 10))
+    .filter(i => process.env[`ACCOUNT${i}_CARD`])
+    .sort((a, b) => a - b);
+
+  const accounts = accountNumbers.map(i => {
     const card = process.env[`ACCOUNT${i}_CARD`];
-    if (!card) break;
-    accounts.push({
+    return {
       id: `account${i}`,
       label: process.env[`ACCOUNT${i}_LABEL`] || `帳號${i}`,
       cardNumber: card,
       password: process.env[`ACCOUNT${i}_PASSWORD`] || '',
-    });
-  }
+    };
+  });
+
   if (accounts.length === 0) {
     throw new Error('找不到帳號設定，請在 .env 中設定 ACCOUNT1_CARD / ACCOUNT1_PASSWORD 等環境變數（參考 .env.example）');
   }
@@ -33,6 +39,30 @@ function readData() {
     return { lastUpdated: null, accounts: [] };
   }
   return JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'));
+}
+
+function mergeMissingConfiguredAccounts(primaryData, fallbackData, configuredAccountIds) {
+  if (!primaryData) return fallbackData;
+  if (!fallbackData || !Array.isArray(fallbackData.accounts)) return primaryData;
+  if (!Array.isArray(configuredAccountIds) || configuredAccountIds.length === 0) return primaryData;
+
+  const primaryAccounts = Array.isArray(primaryData.accounts) ? primaryData.accounts : [];
+  const primaryIds = new Set(primaryAccounts.map(a => a?.id).filter(Boolean));
+  const fallbackById = new Map(
+    fallbackData.accounts
+      .filter(a => a?.id)
+      .map(a => [a.id, a])
+  );
+  const missingAccounts = configuredAccountIds
+    .filter(id => !primaryIds.has(id) && fallbackById.has(id))
+    .map(id => fallbackById.get(id));
+
+  if (missingAccounts.length === 0) return primaryData;
+
+  return {
+    ...primaryData,
+    accounts: [...primaryAccounts, ...missingAccounts],
+  };
 }
 
 function writeData(data) {
@@ -391,6 +421,61 @@ function annotateFirstSeen(oldData, newData) {
   return newData;
 }
 
+const WISHLIST_TAG_READER = '閱讀小博士';
+
+// 把「閱讀小博士」標記攜帶到 borrowed/reservation 書本上。
+// 來源（取聯集）：
+//   1. wishlistData 中 tags 含「閱讀小博士」的條目
+//   2. readerTitles：CSV 等外部來源傳入的書名 Set（永久 source of truth）
+//   3. oldData 上既存的 wishlistTags（一旦寫入即持久化，不會因來源被刪而消失）
+// Mutates newData in place.
+function annotateWishlistTags(oldData, newData, wishlistData, readerTitles) {
+  const oldBorrowedMap = buildGlobalBorrowedMap(oldData);
+  const oldReservationMap = new Map();
+  for (const a of (oldData?.accounts || [])) {
+    for (const r of (a.reservations || [])) {
+      if (r?.title) oldReservationMap.set(r.title, r);
+    }
+  }
+  const fromWishlist = new Set(
+    (wishlistData?.wishlist || [])
+      .filter(w => Array.isArray(w?.tags) && w.tags.includes(WISHLIST_TAG_READER))
+      .map(w => w.title)
+  );
+  const fromReader = readerTitles instanceof Set ? readerTitles : new Set();
+
+  function annotate(item, oldMap) {
+    if (!item?.title) return;
+    const prev = oldMap.get(item.title);
+    const prevTags = Array.isArray(prev?.wishlistTags) ? prev.wishlistTags : [];
+    const next = new Set(prevTags);
+    if (fromWishlist.has(item.title) || fromReader.has(item.title)) {
+      next.add(WISHLIST_TAG_READER);
+    }
+    if (next.size > 0) item.wishlistTags = [...next];
+  }
+
+  for (const account of (newData?.accounts || [])) {
+    for (const book of (account.borrowed || [])) annotate(book, oldBorrowedMap);
+    for (const r of (account.reservations || [])) annotate(r, oldReservationMap);
+  }
+  return newData;
+}
+
+// 讀 data/wishlist-review.csv 中已 matched 的書名作為「閱讀小博士」永久來源。
+// 過濾條件與 importWishlistReview.js 相同。
+function readReaderTitlesFromReview() {
+  const reviewPath = path.join(__dirname, '..', 'data', 'wishlist-review.csv');
+  if (!fs.existsSync(reviewPath)) return new Set();
+  const { parseCsv, BOOK_DATA_TYPE } = require('./generateWishlistReview');
+  const rows = parseCsv(fs.readFileSync(reviewPath, 'utf8'));
+  return new Set(
+    rows
+      .filter(r => r.reviewDecision === 'add' && r.matchStatus === 'matched' && r.dataType === BOOK_DATA_TYPE && r.matchedTitle)
+      .map(r => r.matchedTitle)
+  );
+}
+
 // 比對 old vs new borrowed 書本（全域、以 title 為 key），
 // 回傳在舊資料存在但新資料消失的書本 → history entries。
 // 失敗帳號在 scraper 層已把舊資料保留進 results，因此其 title 仍會出現在 newMap 中，
@@ -415,10 +500,12 @@ function computeHistoryDiff(oldData, newData) {
 
 module.exports = {
   readAccounts, readData, writeData, getSessionPath, pushToKV, readFromKV,
+  mergeMissingConfiguredAccounts,
   readFavorites, writeFavorites, pushFavoritesToKV, readFavoritesFromKV,
   readHistory, writeHistory, pushHistoryToKV, readHistoryFromKV,
   readWishlist, writeWishlist, pushWishlistToKV, readWishlistFromKV,
   DEFAULT_WISHLIST_TAG, normalizeWishlistTags, repairWishlistTags, addOrUpdateWishlistItems,
   buildOwnedTitleSet,
   annotateFirstSeen, computeHistoryDiff,
+  WISHLIST_TAG_READER, annotateWishlistTags, readReaderTitlesFromReview,
 };

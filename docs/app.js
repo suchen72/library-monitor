@@ -885,7 +885,7 @@ function renderBorrowedTable(books) {
   const sorted = [...books].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
 
   const rows = sorted.length === 0
-    ? `<tr class="empty-row"><td colspan="8">目前無借閱書籍</td></tr>`
+    ? `<tr class="empty-row"><td colspan="9">目前無借閱書籍</td></tr>`
     : sorted.map(b => {
         const dueClass = getDueClass(b.dueDate);
         const dueLabel = getDueLabel(b.dueDate);
@@ -902,10 +902,15 @@ function renderBorrowedTable(books) {
           const active = favEntry && favEntry.tags.includes(tag);
           return `<button class="fav-btn ${active ? 'fav-active' : ''}" data-title="${escHtml(b.title)}" data-tag="${escHtml(tag)}" style="--heart-color:${tc.color}" onclick="toggleFavorite(this.dataset.title, this.dataset.tag)" title="${escHtml(tag)}">&#9829;</button>`;
         }).join('');
+        const wishlistBadges = (b.wishlistTags || []).map(t => {
+          const tc = TAG_COLORS[t] || { color: '#718096', label: t[0] };
+          return `<span class="tag-badge" style="background:${tc.color}">${escHtml(t)}</span>`;
+        }).join('');
         const rowClass = dueClass === 'due-overdue' ? ' class="row-overdue"' : '';
         return `<tr${rowClass}>
           <td><span class="acct-tag">${escHtml(b.accountLabel)}</span></td>
           <td>${escHtml(b.title)}</td>
+          <td>${wishlistBadges}</td>
           <td class="${dueClass}">${b.dueDate || '-'} ${dueLabel}</td>
           <td>${(b.renewalCount ?? 0) >= 3 ? `<span class="badge-overdue">${b.renewalCount} 次</span>` : `${b.renewalCount ?? '-'} 次`}</td>
           <td>${reserveCount}</td>
@@ -927,7 +932,7 @@ function renderBorrowedTable(books) {
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>帳號</th><th>書名</th><th>到期日</th><th>已續借</th><th>預約</th><th>狀態</th><th>最愛</th><th>找到</th></tr></thead>
+          <thead><tr><th>帳號</th><th>書名</th><th>標籤</th><th>到期日</th><th>已續借</th><th>預約</th><th>狀態</th><th>最愛</th><th>找到</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -939,7 +944,7 @@ function renderReservationsTable(sortedItems) {
   const totalReady = sortedItems.filter(r => r.isReady).length;
 
   const rows = sortedItems.length === 0
-    ? `<tr class="empty-row"><td colspan="4">目前無預約</td></tr>`
+    ? `<tr class="empty-row"><td colspan="5">目前無預約</td></tr>`
     : sortedItems.map(r => {
         let badge = '';
         let rowClass = '';
@@ -956,9 +961,14 @@ function renderReservationsTable(sortedItems) {
           rowClass = ' class="row-other"';
           lastCol = `<td>${escHtml(r.status ? r.status.substring(0, 40) : '-')}</td>`;
         }
+        const wishlistBadges = (r.wishlistTags || []).map(t => {
+          const tc = TAG_COLORS[t] || { color: '#718096', label: t[0] };
+          return `<span class="tag-badge" style="background:${tc.color}">${escHtml(t)}</span>`;
+        }).join('');
         return `<tr${rowClass}>
           <td><span class="acct-tag">${escHtml(r.accountLabel)}</span></td>
           <td>${badge} ${escHtml(r.title)}</td>
+          <td>${wishlistBadges}</td>
           <td>${escHtml(r.pickupBranch || '-')}</td>
           ${lastCol}
         </tr>`;
@@ -969,7 +979,7 @@ function renderReservationsTable(sortedItems) {
       <div class="section-title">我的預約（共 ${sortedItems.length} 本，${totalReady} 本可領取）</div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>帳號</th><th>書名</th><th>取書館別</th><th>截止日／狀態</th></tr></thead>
+          <thead><tr><th>帳號</th><th>書名</th><th>標籤</th><th>取書館別</th><th>截止日／狀態</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>

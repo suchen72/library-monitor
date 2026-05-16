@@ -5,9 +5,9 @@
 ## 功能
 
 - **多帳號管理** — 同時追蹤多張借閱證的借閱與預約資料
-- **自動更新** — 每天 10:00 自動抓取最新資料（可自訂）
+- **自動更新** — 每天 10:17 自動抓取最新資料（可自訂）
 - **手動更新** — 儀表板上一鍵觸發即時更新
-- **Email 通知** — 每天 10:00 自動更新後寄出每日檢查結果
+- **Email 通知** — 每天 10:17 自動更新後寄出每日檢查結果
 - **Session 持久化** — 登入後儲存 session，避免每次都需要輸入驗證碼
 - **即時進度** — 透過 SSE 在儀表板上顯示更新進度
 - **願望清單** — 支援多標籤、館藏搜尋、館藏/可預約/等待數排序、已借過篩選與直接預約
@@ -56,6 +56,9 @@ ACCOUNT2_LABEL=第二個帳號
 ACCOUNT2_CARD=借閱證號
 ACCOUNT2_PASSWORD=密碼
 
+# 新增帳號時依序加入 ACCOUNT3_*、ACCOUNT4_* ...
+# GitHub Actions 目前已預留 ACCOUNT1_* 到 ACCOUNT10_* secrets。
+
 # Email 通知（選填，不需要可設 EMAIL_ENABLED=false）
 EMAIL_ENABLED=true
 EMAIL_RECIPIENT=收件人@gmail.com
@@ -72,7 +75,7 @@ Email 通知需要 Gmail 應用程式密碼（非帳號密碼）：
 3. 搜尋「應用程式密碼」並建立一組新密碼
 4. 將產生的 16 碼密碼填入 `EMAIL_APP_PASSWORD`
 
-Email 只會由每天 10:00 的自動更新觸發；瀏覽器、LINE、手動 GitHub workflow 的操作不會寄信。瀏覽器操作只在瀏覽器顯示，LINE 操作只在 LINE 顯示，但需要更新資料的動作仍會寫入 KV。
+Email 只會由每天 10:17 的自動更新觸發；瀏覽器、LINE、手動 GitHub workflow 的操作不會寄信。瀏覽器操作只在瀏覽器顯示，LINE 操作只在 LINE 顯示，但需要更新資料的動作仍會寫入 KV。
 
 ## 使用
 
@@ -115,7 +118,8 @@ node -e "const {readWishlist,pushWishlistToKV}=require('./src/dataStore'); pushW
 
 - 2026-05-05: 完成 `booklist.csv` → `wishlist-review.csv` → wishlist 的人工審核匯入流程。產生器會排除非圖書資料型別，標記短書名/非完全同名等需要人工確認的列；匯入器會保留館藏欄位並合併既有願望清單標籤。
 - 2026-05-05: 已將審核後的 `add` 列同步到 Cloudflare KV。遠端願望清單共 441 筆，其中 225 筆帶 `閱讀小博士` 標籤。
-- 2026-05-07: 調整通知分流與自動更新時程。每日自動更新改為台灣時間 10:00，且只由每日排程觸發 Email；瀏覽器操作只回瀏覽器，LINE 操作只回 LINE。續借與預約成功後會重新抓取帳號狀態並同步 Cloudflare KV。
+- 2026-05-07: 調整通知分流與自動更新時程。每日自動更新改為台灣時間 10:17，且只由每日排程觸發 Email；瀏覽器操作只回瀏覽器，LINE 操作只回 LINE。續借與預約成功後會重新抓取帳號狀態並同步 Cloudflare KV。
+- 2026-05-16: 修正新增帳號未出現在瀏覽器初始畫面的問題。GitHub Actions 預留 `ACCOUNT1_*` 到 `ACCOUNT10_*`，帳號讀取不再因中間缺號停止，且 `/api/data` 會用本地資料補上 KV 暫缺但已設定的帳號。
 
 ## Roadmap
 

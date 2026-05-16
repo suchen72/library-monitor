@@ -3,6 +3,7 @@ const fs = require('fs');
 const {
   readAccounts, writeData, readData, getSessionPath,
   readHistory, writeHistory, annotateFirstSeen, computeHistoryDiff,
+  readWishlist, annotateWishlistTags, readReaderTitlesFromReview,
 } = require('./dataStore');
 const captchaSolver = require('./captchaSolver');
 
@@ -75,6 +76,7 @@ async function scrapeAll(emitEvent) {
   // 閱讀歷史：在寫檔前比對舊資料，偵測「真的歸還」並記錄。
   // 同時回寫 firstSeen 到每本借閱書上（用來推算借閱期間）。
   annotateFirstSeen(existing, newData);
+  annotateWishlistTags(existing, newData, readWishlist(), readReaderTitlesFromReview());
   const diffEntries = computeHistoryDiff(existing, newData);
   if (diffEntries.length > 0) {
     const history = readHistory();
