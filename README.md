@@ -66,6 +66,42 @@ EMAIL_SENDER=寄件人@gmail.com
 EMAIL_APP_PASSWORD=Gmail應用程式密碼
 ```
 
+### 新增帳號 SOP
+
+新增借閱帳號時，必須同時更新本機 `.env` 和 GitHub Actions secrets，否則本機手動更新看得到新帳號，但每日 GitHub Actions 排程可能用舊帳號清單覆蓋 Cloudflare KV。
+
+1. 在本機 `.env` 加入下一組帳號變數，例如第四個帳號：
+
+   ```env
+   ACCOUNT4_LABEL=Daniel
+   ACCOUNT4_CARD=借閱證號
+   ACCOUNT4_PASSWORD=密碼
+   ```
+
+2. 到 GitHub repo 設定新增同名 secrets：
+
+   `Settings` -> `Secrets and variables` -> `Actions` -> `Repository secrets` -> `New repository secret`
+
+   逐一新增：
+
+   - `ACCOUNT4_LABEL`
+   - `ACCOUNT4_CARD`
+   - `ACCOUNT4_PASSWORD`
+
+   GitHub 不會顯示 secret 內容，只能確認名稱和更新時間。
+
+3. 手動跑一次 GitHub Actions workflow 驗證：
+
+   `Actions` -> `Library Scrape & Notify` -> `Run workflow`
+
+4. workflow 完成後，打開儀表板確認新帳號出現。也可以用本機讀 KV 檢查：
+
+   ```bash
+   node -e "const {readFromKV}=require('./src/dataStore'); readFromKV().then(data=>console.log((data.accounts||[]).map(a=>`${a.id}:${a.label}`).join('\n')))"
+   ```
+
+目前 workflow 已預留 `ACCOUNT1_*` 到 `ACCOUNT10_*`，所以第 1 到第 10 個帳號只需要加 secrets，不需要再改 `.github/workflows/scrape.yml`。
+
 ### Gmail App Password
 
 Email 通知需要 Gmail 應用程式密碼（非帳號密碼）：
@@ -120,6 +156,7 @@ node -e "const {readWishlist,pushWishlistToKV}=require('./src/dataStore'); pushW
 - 2026-05-05: 已將審核後的 `add` 列同步到 Cloudflare KV。遠端願望清單共 441 筆，其中 225 筆帶 `閱讀小博士` 標籤。
 - 2026-05-07: 調整通知分流與自動更新時程。每日自動更新改為台灣時間 10:17，且只由每日排程觸發 Email；瀏覽器操作只回瀏覽器，LINE 操作只回 LINE。續借與預約成功後會重新抓取帳號狀態並同步 Cloudflare KV。
 - 2026-05-16: 修正新增帳號未出現在瀏覽器初始畫面的問題。GitHub Actions 預留 `ACCOUNT1_*` 到 `ACCOUNT10_*`，帳號讀取不再因中間缺號停止，且 `/api/data` 會用本地資料補上 KV 暫缺但已設定的帳號。
+- 2026-05-17: 補上新增帳號 SOP，明確記錄本機 `.env`、GitHub Actions secrets、手動 workflow 驗證和 KV 讀回確認步驟。
 
 ## Roadmap
 
