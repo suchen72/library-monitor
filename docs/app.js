@@ -25,6 +25,7 @@ const TAG_COLORS = {
 
 window.addEventListener('DOMContentLoaded', () => {
   loadData();
+  connectRefreshStream();
   document.getElementById('refreshBtn').addEventListener('click', triggerRefresh);
 
   // Tab switching
@@ -748,54 +749,79 @@ function computeDaysBetween(firstSeen, returnedDate) {
 
 // --- Trigger refresh ---
 async function triggerRefresh() {
-  const btn = document.getElementById('refreshBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>更新中…';
+  setRefreshingUI(true);
   showBanner('info', '正在更新資料…');
-
   try {
     const res = await fetch('/api/refresh', { method: 'POST' });
     const result = await res.json();
     if (result.status === 'already-refreshing') {
       showBanner('warning', '已有更新正在進行中');
-    } else {
-      // Listen to SSE for progress
-      listenRefreshStatus();
     }
+    // Completion (and re-enabling the button) is driven by the refresh stream.
   } catch (err) {
     showBanner('error', '觸發更新失敗：' + err.message);
-    btn.disabled = false;
-    btn.textContent = '立即更新';
+    setRefreshingUI(false);
   }
 }
 
-function listenRefreshStatus() {
+// --- Persistent refresh-status stream ---
+// One long-lived SSE connection. The browser auto-reconnects after the server
+// ends the stream (it does so after each refresh), so every refresh — manual,
+// post-reserve, post-renew, or the daily cron — reconciles the dashboard once
+// its data has been synced to KV.
+let refreshSafetyTimer = null;
+
+function connectRefreshStream() {
   const es = new EventSource('/api/refresh-status');
   es.onmessage = (e) => {
-    const event = JSON.parse(e.data);
-    if (event.type === 'complete') {
-      es.close();
-      showBanner('info', '更新完成！');
-      document.getElementById('refreshBtn').disabled = false;
-      document.getElementById('refreshBtn').textContent = '立即更新';
+    let event;
+    try { event = JSON.parse(e.data); } catch { return; }
+    handleRefreshEvent(event);
+  };
+  // On error the browser auto-reconnects; never call es.close() here.
+}
+
+function handleRefreshEvent(event) {
+  switch (event.type) {
+    case 'refreshing':
+    case 'started':
+    case 'logging-in':
+      setRefreshingUI(true);
+      if (event.label) showBanner('info', `正在更新 ${event.label}…`);
+      break;
+    case 'done':
+      if (event.label) showBanner('info', `${event.label} 更新完成`);
+      break;
+    case 'complete':
+      // Scraping finished; KV sync still in progress.
+      showBanner('info', '資料同步中…');
+      break;
+    case 'synced':
+      // Scrape done and KV updated — now safe to reload authoritative data.
+      setRefreshingUI(false);
+      showBanner('info', '資料已更新');
       loadData();
-    } else if (event.type === 'error-fatal') {
-      es.close();
+      break;
+    case 'error-fatal':
+      setRefreshingUI(false);
       showBanner('error', '更新失敗：' + (event.message || '未知錯誤'));
-      document.getElementById('refreshBtn').disabled = false;
-      document.getElementById('refreshBtn').textContent = '立即更新';
-    } else if (event.type === 'started' || event.type === 'logging-in') {
-      showBanner('info', `正在更新 ${event.label || ''}…`);
-    } else if (event.type === 'done') {
-      showBanner('info', `${event.label || ''} 更新完成`);
-    }
-  };
-  es.onerror = () => {
-    es.close();
-    document.getElementById('refreshBtn').disabled = false;
-    document.getElementById('refreshBtn').textContent = '立即更新';
-    loadData();
-  };
+      break;
+  }
+}
+
+function setRefreshingUI(refreshing) {
+  const btn = document.getElementById('refreshBtn');
+  if (!btn) return;
+  btn.disabled = refreshing;
+  if (refreshing) {
+    btn.innerHTML = '<span class="spinner"></span>更新中…';
+    // Safety net: re-enable the button if no completion event ever arrives.
+    clearTimeout(refreshSafetyTimer);
+    refreshSafetyTimer = setTimeout(() => setRefreshingUI(false), 240000);
+  } else {
+    btn.textContent = '立即更新';
+    clearTimeout(refreshSafetyTimer);
+  }
 }
 
 function renderDashboard(data) {

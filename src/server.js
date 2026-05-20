@@ -70,7 +70,8 @@ app.get('/api/refresh-status', (req, res) => {
 
   const listener = (event) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
-    if (event.type === 'complete' || event.type === 'error-fatal') {
+    // 'synced' marks scrape done AND KV updated — safe for clients to reload.
+    if (event.type === 'synced' || event.type === 'error-fatal') {
       res.end();
     }
   };
@@ -313,14 +314,36 @@ app.delete('/api/favorites', async (req, res) => {
 });
 
 // --- Refresh logic ---
-async function triggerRefresh({
+let pendingRefresh = null; // refresh options queued while another refresh runs
+
+async function triggerRefresh(options = {}) {
+  // A refresh is already running: queue a single follow-up instead of
+  // dropping the request, so mutations made mid-scrape still get re-scraped.
+  if (isRefreshing) {
+    pendingRefresh = mergeRefreshOptions(pendingRefresh, options);
+    console.log('[refresh] Busy — queued a follow-up refresh');
+    return;
+  }
+
+  isRefreshing = true;
+  try {
+    let opts = options;
+    while (opts) {
+      pendingRefresh = null;
+      await runRefresh(opts);
+      opts = pendingRefresh; // set if a mutation requested a refresh mid-run
+    }
+  } finally {
+    pendingRefresh = null;
+    isRefreshing = false;
+  }
+}
+
+async function runRefresh({
   notify = true,
   notificationChannels = { line: true, email: true },
 } = {}) {
-  if (isRefreshing) return;
-  isRefreshing = true;
   console.log(`[${new Date().toISOString()}] Starting refresh...`);
-
   try {
     await scrapeAll((event) => {
       console.log('[scrape event]', event);
@@ -328,19 +351,32 @@ async function triggerRefresh({
     });
     console.log(`[${new Date().toISOString()}] Refresh complete.`);
 
-    // Push refreshed data to KV; scheduled refreshes also send notifications.
+    // Push refreshed data to KV, then tell clients it is safe to reload.
     const latestData = readData();
     await pushToKV(latestData);
     await pushHistoryToKV(readHistory());
+    events.emit('scrape', { type: 'synced' });
+
+    // Scheduled refreshes also send notifications; a notification failure
+    // must not be reported as a refresh failure — the data is already synced.
     if (notify) {
-      await notifyDaily(latestData, notificationChannels);
+      try {
+        await notifyDaily(latestData, notificationChannels);
+      } catch (err) {
+        console.error('Notification failed:', err.message);
+      }
     }
   } catch (err) {
     console.error('Refresh failed:', err.message);
     events.emit('scrape', { type: 'error-fatal', message: err.message });
-  } finally {
-    isRefreshing = false;
   }
+}
+
+// A notifying refresh (daily cron) outranks a silent mutation refresh when
+// both get queued behind a running refresh.
+function mergeRefreshOptions(current, incoming) {
+  if (!current) return incoming;
+  return incoming.notify ? incoming : current;
 }
 
 function refreshAfterMutation(label) {
