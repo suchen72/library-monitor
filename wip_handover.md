@@ -1,73 +1,59 @@
-# Closeout: Reservation Sync Fix
+# Closeout: Refresh Status SSE Crash Fix
 
 ## Status
 
-This work is closed out and pushed to `main`.
+This work is complete and ready to deploy.
 
 Completed areas:
 
-- The dashboard reservation quota no longer gets stuck below the real value.
-- Refreshes requested while another refresh is running are queued, not dropped.
-- The browser reloads data only after Cloudflare KV has been updated.
+- The server no longer crashes with `ERR_STREAM_WRITE_AFTER_END` when refreshes
+  happen back-to-back.
+- SSE listeners for `/api/refresh-status` are cleaned up when the stream ends,
+  the client disconnects, or the response errors.
+- Reservation-triggered refresh behavior is unchanged: successful reservations
+  still request a background all-account refresh, and queued refresh requests
+  are still coalesced while one is already running.
 
 ## Problem
 
-- The `剩 X 本可預約` badge is derived from an in-memory `reserveCount` that
-  only refreshes when `loadData()` runs.
-- A refresh triggered after a reservation (`refreshAfterMutation`) was silently
-  dropped when another refresh was already running (`isRefreshing` guard).
-- The SSE `complete` event fired after scraping but before the KV push, so a
-  client reloading on `complete` could read stale KV and overwrite the
-  optimistic count back down.
-- Net effect: a reservation made on the dashboard could leave the quota stuck
-  showing free slots that no longer existed.
+- `/api/refresh-status` registered a `scrape` listener for each SSE response.
+- When a refresh emitted `synced` or `error-fatal`, the server called
+  `res.end()`, but the listener was only removed on `req.close`.
+- In a fast follow-up refresh, the stale listener could receive the next
+  `started` event and call `res.write()` on an already-ended response.
+- On Node 25 this surfaced as an unhandled `ServerResponse` error:
+  `ERR_STREAM_WRITE_AFTER_END`, which terminated the server process.
 
 ## Changes
 
 ### `src/server.js`
 
-- `triggerRefresh` queues a follow-up in `pendingRefresh` instead of dropping
-  the request when `isRefreshing` is true; a loop runs the queued refresh after
-  the current one finishes, so a mutation always gets a covering re-scrape.
-- Scrape body extracted into `runRefresh`, which emits a new `synced` event
-  after `pushToKV` / `pushHistoryToKV` succeed.
-- `/api/refresh-status` ends the SSE stream on `synced` instead of `complete`.
-- A notification failure no longer surfaces as a refresh failure.
-- `mergeRefreshOptions` keeps a notifying (daily) refresh ahead of silent
-  mutation refreshes when both are queued.
+- Added an idempotent `cleanup()` helper inside `/api/refresh-status`.
+- Removed the SSE listener before ending the response on `synced` or
+  `error-fatal`.
+- Added guards for `res.writableEnded` and `res.destroyed` before writing.
+- Added cleanup hooks for `req.close`, `res.close`, `res.finish`, and
+  `res.error`.
+- Logged SSE response errors after cleanup so they no longer become unhandled
+  process crashes.
 
-### `docs/app.js`
+## Refresh Behavior Notes
 
-- Added `connectRefreshStream()` — one persistent EventSource opened on load.
-  The browser auto-reconnects after the server ends the stream, so every
-  refresh (manual, post-reserve, post-renew, daily cron) reconciles the
-  dashboard once its data is synced.
-- `loadData()` is called on `synced` only — never on `complete`.
-- Rewrote the `triggerRefresh` button handler; removed `listenRefreshStatus()`.
-- `setRefreshingUI` drives button state and has a safety timeout.
-- `reserveBook` keeps its optimistic `reserveCount++` for instant feedback;
-  the persistent stream corrects it once the background refresh syncs.
-
-## Event Model
-
-- `started` / `logging-in` / `done` — per-account scrape progress.
-- `complete` — scraping finished; KV not yet updated.
-- `synced` — scrape finished AND data pushed to KV; clients may reload.
-- `error-fatal` — scrape or KV push failed.
+- Manual refresh, daily cron, successful reservation, successful single renew,
+  and successful batch renew all still use the same refresh pipeline.
+- Refreshes are all-account refreshes because `runRefresh()` calls
+  `scrapeAll()`.
+- If multiple reservation or renew actions request refresh while one is already
+  running, they are merged into one follow-up refresh through `pendingRefresh`.
 
 ## Validation
 
-- `node --check` on `src/server.js` and `docs/app.js` passed.
-- `npm test` — 76 tests passed.
-- New server booted on a test port; startup clean and SSE endpoint reachable.
+- `node --check src/server.js` passed.
+- `node --check docs/app.js` passed.
+- `npm test` passed: 76 tests.
 
 ## Deploy Note
 
-- The long-running server (launchd / `npm start`) must be restarted to pick up
-  these changes.
-
-## Future Work
-
-- Give a still-pending reservation its own optimistic state so a mid-chain
-  refresh cannot briefly hide it before the follow-up refresh confirms it.
-- Make `RESERVE_LIMIT` (hardcoded `7` in `docs/app.js`) configurable per card.
+- Restart the long-running server process (`launchd` / `npm start`) after this
+  change is pulled, otherwise the running Node process will still have the old
+  SSE listener behavior.

@@ -63,21 +63,39 @@ app.get('/api/refresh-status', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    events.off('scrape', listener);
+  };
+
   // Send current status immediately
   if (isRefreshing) {
     res.write(`data: ${JSON.stringify({ type: 'refreshing' })}\n\n`);
   }
 
   const listener = (event) => {
+    if (res.writableEnded || res.destroyed) {
+      cleanup();
+      return;
+    }
     res.write(`data: ${JSON.stringify(event)}\n\n`);
     // 'synced' marks scrape done AND KV updated — safe for clients to reload.
     if (event.type === 'synced' || event.type === 'error-fatal') {
+      cleanup();
       res.end();
     }
   };
 
   events.on('scrape', listener);
-  req.on('close', () => events.off('scrape', listener));
+  req.on('close', cleanup);
+  res.on('close', cleanup);
+  res.on('finish', cleanup);
+  res.on('error', (err) => {
+    cleanup();
+    console.error('[refresh-status] SSE response error:', err.message);
+  });
 });
 
 // --- API: Favorites ---
