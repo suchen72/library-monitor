@@ -11,9 +11,10 @@ const {
 } = require('../src/libraryHours');
 
 describe('isClosed', () => {
-  it('國定假日 → true', () => {
+  it('官方休館日 → true', () => {
     assert.equal(isClosed('2026-01-01'), true);  // 元旦
     assert.equal(isClosed('2026-04-04'), true);  // 兒童節
+    assert.equal(isClosed('2026-06-19'), true);  // 端午節
     assert.equal(isClosed('2026-10-10'), true);  // 國慶日
   });
 
@@ -24,6 +25,7 @@ describe('isClosed', () => {
 
   it('一般日 → false', () => {
     assert.equal(isClosed('2026-04-07'), false);
+    assert.equal(isClosed('2026-06-01'), false);
     assert.equal(isClosed('2026-06-15'), false);
     assert.equal(isClosed('2026-08-10'), false);
   });
@@ -40,9 +42,10 @@ describe('isClosed', () => {
 });
 
 describe('getClosureReason', () => {
-  it('國定假日 → "國定假日"', () => {
-    assert.equal(getClosureReason('2026-04-04'), '國定假日');
-    assert.equal(getClosureReason('2026-02-28'), '國定假日');
+  it('官方休館日 → 休館原因', () => {
+    assert.equal(getClosureReason('2026-04-04'), '兒童節、清明節');
+    assert.equal(getClosureReason('2026-02-28'), '和平紀念日');
+    assert.equal(getClosureReason('2026-06-19'), '端午節');
   });
 
   it('清館日 → "清館日"', () => {
@@ -54,9 +57,9 @@ describe('getClosureReason', () => {
     assert.equal(getClosureReason('2026-06-15'), null);
   });
 
-  it('優先級：國定假日 > 清館日', () => {
-    // 2026-01-01 同時是國定假日和第一個週四
-    assert.equal(getClosureReason('2026-01-01'), '國定假日');
+  it('優先級：官方休館原因 > 清館日', () => {
+    // 2026-01-01 同時是官方休館日和第一個週四
+    assert.equal(getClosureReason('2026-01-01'), '開國紀念日');
   });
 });
 
@@ -70,19 +73,17 @@ describe('getLastOpenDay', () => {
     assert.equal(getLastOpenDay('2026-07-02'), '2026-07-01');
   });
 
-  it('連續假期 → 跳過整段', () => {
-    // 4/3~4/6 都是國定假日，4/2 是清館日 → 回到 4/1
-    assert.equal(getLastOpenDay('2026-04-06'), '2026-04-01');
-    assert.equal(getLastOpenDay('2026-04-05'), '2026-04-01');
-    assert.equal(getLastOpenDay('2026-04-03'), '2026-04-01');
+  it('連續休館 → 跳過整段', () => {
+    // 4/4~4/5 是官方休館日，4/3 是開館日
+    assert.equal(getLastOpenDay('2026-04-05'), '2026-04-03');
+    assert.equal(getLastOpenDay('2026-04-04'), '2026-04-03');
   });
 
   it('春節長假 → 跳過所有天', () => {
-    // 2/16~2/21 春節，2/15 應該是開館日
-    const result = getLastOpenDay('2026-02-21');
+    // 2/15~2/20 春節，2/14 應該是開館日
+    const result = getLastOpenDay('2026-02-20');
     assert.equal(isClosed(result), false);
-    // 2/15 是日（Sunday），不是清館日也不是國定假日
-    assert.equal(result, '2026-02-15');
+    assert.equal(result, '2026-02-14');
   });
 });
 
