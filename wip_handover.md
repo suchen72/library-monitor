@@ -1,4 +1,4 @@
-# Closeout: Refresh Status SSE Crash Fix
+# Closeout: Auto-Renew Day-Before Fix
 
 ## Status
 
@@ -6,54 +6,65 @@ This work is complete and ready to deploy.
 
 Completed areas:
 
-- The server no longer crashes with `ERR_STREAM_WRITE_AFTER_END` when refreshes
-  happen back-to-back.
-- SSE listeners for `/api/refresh-status` are cleaned up when the stream ends,
-  the client disconnects, or the response errors.
-- Reservation-triggered refresh behavior is unchanged: successful reservations
-  still request a background all-account refresh, and queued refresh requests
-  are still coalesced while one is already running.
+- Auto-renew now targets books due today or tomorrow.
+- GitHub Actions logs now include one line per auto-renew result, including
+  account label, title, success/failure, and message.
+- Tests cover the auto-renew target selection rules.
 
 ## Problem
 
-- `/api/refresh-status` registered a `scrape` listener for each SSE response.
-- When a refresh emitted `synced` or `error-fatal`, the server called
-  `res.end()`, but the listener was only removed on `req.close`.
-- In a fast follow-up refresh, the stale listener could receive the next
-  `started` event and call `res.write()` on an already-ended response.
-- On Node 25 this surfaced as an unhandled `ServerResponse` error:
-  `ERR_STREAM_WRITE_AFTER_END`, which terminated the server process.
+- The expected behavior was to auto-renew books the day before they expire.
+- The existing implementation only selected books due today:
+  `daysUntil(b.dueDate) === 0`.
+- When a scheduled GitHub Actions run started late, books could already be
+  expired or no longer renewable by the time the workflow attempted renewal.
+- The Actions log only showed account-level attempts, so failed/skipped titles
+  could not be diagnosed from GitHub logs alone.
 
 ## Changes
 
-### `src/server.js`
+### `src/notifier.js`
 
-- Added an idempotent `cleanup()` helper inside `/api/refresh-status`.
-- Removed the SSE listener before ending the response on `synced` or
-  `error-fatal`.
-- Added guards for `res.writableEnded` and `res.destroyed` before writing.
-- Added cleanup hooks for `req.close`, `res.close`, `res.finish`, and
-  `res.error`.
-- Logged SSE response errors after cleanup so they no longer become unhandled
-  process crashes.
+- Updated `getAutoRenewTargets()` to include books with `daysUntil` from 0 to 1.
+- Kept existing safety filters:
+  - `canRenew === true`
+  - `renewalCount < 3`
+  - `reservationCount === 0`
+  - account `status === "ok"`
 
-## Refresh Behavior Notes
+### `src/renewer.js`
 
-- Manual refresh, daily cron, successful reservation, successful single renew,
-  and successful batch renew all still use the same refresh pipeline.
-- Refreshes are all-account refreshes because `runRefresh()` calls
-  `scrapeAll()`.
-- If multiple reservation or renew actions request refresh while one is already
-  running, they are merged into one follow-up refresh through `pendingRefresh`.
+- Updated auto-renew comments and no-target log text to say "today or tomorrow".
+- Added per-title result logging:
+  - success/failure
+  - account label
+  - title
+  - renewer message
+
+### `src/run.js`
+
+- Updated the daily mode comment to match the new today-or-tomorrow behavior.
+
+### `tests/notifier.test.js`
+
+- Added coverage for `getAutoRenewTargets()`:
+  - includes books due today
+  - includes books due tomorrow
+  - excludes books due after tomorrow
+  - excludes overdue books
+  - excludes non-renewable, renewal-count-maxed, reserved, and error-account
+    books
 
 ## Validation
 
-- `node --check src/server.js` passed.
-- `node --check docs/app.js` passed.
-- `npm test` passed: 76 tests.
+- `node --check src/notifier.js` passed.
+- `node --check src/renewer.js` passed.
+- `node --check src/run.js` passed.
+- `npm test` passed: 78 tests.
 
 ## Deploy Note
 
-- Restart the long-running server process (`launchd` / `npm start`) after this
-  change is pulled, otherwise the running Node process will still have the old
-  SSE listener behavior.
+- Push to `origin/main` is enough for the next GitHub Actions daily schedule to
+  use the new auto-renew target logic.
+- Restart any long-running local `npm start` / launchd server process after
+  pulling if local daily cron behavior should use this change.

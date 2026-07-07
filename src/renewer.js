@@ -196,7 +196,7 @@ async function _loginAndNavigate(browser, account) {
 }
 
 /**
- * Auto-renew books due today across all accounts.
+ * Auto-renew books due today or tomorrow across all accounts.
  * @param {object} data - scraped data from readData()
  */
 async function autoRenew(data) {
@@ -205,7 +205,7 @@ async function autoRenew(data) {
   const allResults = [];
 
   if (targets.length === 0) {
-    console.log('[renewer] No books due today for auto-renewal');
+    console.log('[renewer] No books due today or tomorrow for auto-renewal');
     return { results: allResults };
   }
 
@@ -216,7 +216,10 @@ async function autoRenew(data) {
     console.log(`[renewer] Auto-renewing ${titles.length} book(s) for ${label}`);
     const { results } = await renewByAccount(accountId, titles);
     for (const r of results) {
-      allResults.push({ accountId, accountLabel: label, ...r });
+      const result = { accountId, accountLabel: label, ...r };
+      allResults.push(result);
+      const status = result.success ? 'success' : 'failed';
+      console.log(`[renewer] Auto-renew ${status}: ${label} / ${result.title} - ${result.message}`);
     }
   }
 

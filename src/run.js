@@ -51,7 +51,7 @@ async function scrapeAndSync() {
 
     let data = await scrapeAndSync();
 
-    // Auto-renew books due today (daily mode only)
+    // Auto-renew books due today or tomorrow (daily mode only)
     if (mode === 'daily') {
       const { results } = await autoRenew(data);
       if (results.length > 0) {

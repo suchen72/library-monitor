@@ -420,7 +420,8 @@ function getAutoRenewTargets(data) {
     if (account.status !== 'ok') continue;
     const titles = (account.borrowed || [])
       .filter(b => b.canRenew && (b.renewalCount ?? 0) < 3
-        && (b.reservationCount ?? 0) === 0 && daysUntil(b.dueDate) === 0)
+        && (b.reservationCount ?? 0) === 0
+        && daysUntil(b.dueDate) >= 0 && daysUntil(b.dueDate) <= 1)
       .map(b => b.title);
     if (titles.length > 0) {
       targets.push({ accountId: account.id, titles });

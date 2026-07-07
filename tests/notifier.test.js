@@ -5,6 +5,7 @@ const {
   buildReservations,
   buildReturnAdvice,
   buildSummary,
+  getAutoRenewTargets,
 } = require('../src/notifier');
 
 // 產生相對於今天的日期字串（使用 local time 格式，與 notifier 的 getToday() 一致）
@@ -312,5 +313,50 @@ describe('buildSummary', () => {
       }),
     ]));
     assert.ok(msg.includes('1 本可取'));
+  });
+});
+
+// --- getAutoRenewTargets ---
+
+describe('getAutoRenewTargets', () => {
+  it('選出今天與明天到期且可續借的書', () => {
+    const targets = getAutoRenewTargets(makeData([
+      makeAccount({
+        id: 'account1',
+        borrowed: [
+          { title: '今天到期', dueDate: daysFromNow(0), canRenew: true, renewalCount: 0, reservationCount: 0 },
+          { title: '明天到期', dueDate: daysFromNow(1), canRenew: true, renewalCount: 0, reservationCount: 0 },
+          { title: '後天到期', dueDate: daysFromNow(2), canRenew: true, renewalCount: 0, reservationCount: 0 },
+          { title: '已逾期', dueDate: daysFromNow(-1), canRenew: true, renewalCount: 0, reservationCount: 0 },
+        ],
+      }),
+    ]));
+
+    assert.deepEqual(targets, [{
+      accountId: 'account1',
+      titles: ['今天到期', '明天到期'],
+    }]);
+  });
+
+  it('排除不可續借、續借滿 3 次、有人預約與錯誤帳號', () => {
+    const targets = getAutoRenewTargets(makeData([
+      makeAccount({
+        id: 'account1',
+        borrowed: [
+          { title: '不可續借', dueDate: daysFromNow(1), canRenew: false, renewalCount: 0, reservationCount: 0 },
+          { title: '滿三次', dueDate: daysFromNow(1), canRenew: true, renewalCount: 3, reservationCount: 0 },
+          { title: '有人預約', dueDate: daysFromNow(1), canRenew: true, renewalCount: 0, reservationCount: 1 },
+        ],
+      }),
+      makeAccount({
+        id: 'account2',
+        status: 'error',
+        borrowed: [
+          { title: '錯誤帳號', dueDate: daysFromNow(1), canRenew: true, renewalCount: 0, reservationCount: 0 },
+        ],
+      }),
+    ]));
+
+    assert.deepEqual(targets, []);
   });
 });
